@@ -7,20 +7,27 @@ import { Schema, NodeSpec, MarkSpec, DOMOutputSpec } from 'prosemirror-model';
 import { ScreenplayBlockType } from '../../types/screenplay';
 
 // Helper to render block DOM based on type and indentation
-const blockDOM = (type: ScreenplayBlockType, id: string, contd: boolean): DOMOutputSpec => {
+const blockDOM = (
+  type: ScreenplayBlockType,
+  id: string,
+  contd: boolean,
+  annotation?: string,
+  comment?: string
+): DOMOutputSpec => {
   let className = `screenplay-block block-${type.replace('_', '-')}`;
   if (contd) className += ' has-contd';
 
-  return [
-    'div',
-    {
-      'data-block-id': id,
-      'data-block-type': type,
-      'data-contd': contd ? 'true' : 'false',
-      class: className,
-    },
-    0, // Content hole
-  ];
+  const attrs: Record<string, string> = {
+    'data-block-id': id,
+    'data-block-type': type,
+    'data-contd': contd ? 'true' : 'false',
+    class: className,
+  };
+
+  if (annotation) attrs['data-annotation'] = annotation;
+  if (comment) attrs['data-comment'] = comment;
+
+  return ['div', attrs, 0];
 };
 
 const nodes: { [key: string]: NodeSpec } = {
@@ -35,6 +42,8 @@ const nodes: { [key: string]: NodeSpec } = {
       id: { default: '' },
       type: { default: 'action' as ScreenplayBlockType },
       contd: { default: false },
+      annotation: { default: '' },
+      comment: { default: '' },
     },
     parseDOM: [
       {
@@ -45,12 +54,20 @@ const nodes: { [key: string]: NodeSpec } = {
             id: el.getAttribute('data-block-id') || '',
             type: (el.getAttribute('data-block-type') as ScreenplayBlockType) || 'action',
             contd: el.getAttribute('data-contd') === 'true',
+            annotation: el.getAttribute('data-annotation') || '',
+            comment: el.getAttribute('data-comment') || '',
           };
         },
       },
     ],
     toDOM(node) {
-      return blockDOM(node.attrs.type, node.attrs.id, node.attrs.contd);
+      return blockDOM(
+        node.attrs.type,
+        node.attrs.id,
+        node.attrs.contd,
+        node.attrs.annotation,
+        node.attrs.comment
+      );
     },
   },
 
@@ -102,6 +119,72 @@ const marks: { [key: string]: MarkSpec } = {
     ],
     toDOM(mark) {
       return ['span', { style: `color: ${mark.attrs.color}`, 'data-color': mark.attrs.color }, 0];
+    },
+  },
+  highlight: {
+    attrs: {
+      color: { default: 'rgba(234, 179, 8, 0.35)' },
+    },
+    parseDOM: [
+      {
+        tag: 'mark',
+        getAttrs: (dom) => ({
+          color: (dom as HTMLElement).getAttribute('data-highlight') || 'rgba(234, 179, 8, 0.35)',
+        }),
+      },
+      {
+        style: 'background-color',
+        getAttrs: (value) => ({ color: value }),
+      },
+      {
+        tag: 'span[data-highlight]',
+        getAttrs: (dom) => ({
+          color: (dom as HTMLElement).getAttribute('data-highlight') || (dom as HTMLElement).style.backgroundColor,
+        }),
+      },
+    ],
+    toDOM(mark) {
+      return [
+        'mark',
+        {
+          style: `background-color: ${mark.attrs.color}; color: inherit; border-radius: 2px; padding: 1px 3px; -webkit-box-decoration-break: clone; box-decoration-break: clone;`,
+          'data-highlight': mark.attrs.color,
+        },
+        0,
+      ];
+    },
+  },
+  link: {
+    attrs: {
+      href: { default: '' },
+      title: { default: null },
+    },
+    inclusive: false,
+    parseDOM: [
+      {
+        tag: 'a[href]',
+        getAttrs(dom) {
+          const el = dom as HTMLElement;
+          return {
+            href: el.getAttribute('href') || '',
+            title: el.getAttribute('title') || null,
+          };
+        },
+      },
+    ],
+    toDOM(node) {
+      return [
+        'a',
+        {
+          href: node.attrs.href,
+          title: node.attrs.title || node.attrs.href,
+          target: '_blank',
+          rel: 'noopener noreferrer',
+          class: 'screenplay-link',
+          style: 'color: var(--text-accent); text-decoration: underline; cursor: pointer;',
+        },
+        0,
+      ];
     },
   },
 };

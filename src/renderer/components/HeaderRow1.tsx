@@ -7,7 +7,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   FolderOpen,
   Search,
-  Bell,
   Check,
   Loader2,
   AlertCircle,
@@ -178,17 +177,6 @@ export const HeaderRow1: React.FC<HeaderRow1Props> = ({
           className="ds-icon-btn no-drag"
         >
           <Search size={14} />
-        </button>
-
-        {/* Notification Bell */}
-        <button
-          type="button"
-          disabled
-          title="Notifications (Coming in V1.1)"
-          className="ds-icon-btn no-drag"
-          aria-disabled="true"
-        >
-          <Bell size={14} />
         </button>
 
         <div style={{ width: '1px', height: '16px', background: 'var(--line-separator)' }} />

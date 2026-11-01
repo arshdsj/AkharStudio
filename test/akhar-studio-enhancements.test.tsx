@@ -50,7 +50,7 @@ describe('AkharStudio Enhancements Test Suite', () => {
 
   const sampleDraft: ScriptDraft = {
     id: 'draft_enhancement_test',
-    name: 'Main Draft',
+    name: 'Master Draft',
     isMain: true,
     createdAt: new Date().toISOString(),
     modifiedAt: new Date().toISOString(),
@@ -185,26 +185,26 @@ describe('AkharStudio Enhancements Test Suite', () => {
   // 2. ABOUT SECTION AND VERSION NUMBERING
   // =========================================================================
   describe('2. About Section & Version Numbering', () => {
-    it('centralizes version as 1.1 and author as Arsh DSJ', () => {
-      expect(APP_VERSION).toBe('1.1');
+    it('centralizes version as 1.2 and author as Arsh DSJ', () => {
+      expect(APP_VERSION).toBe('1.2');
       expect(APP_AUTHOR).toBe('Arsh DSJ');
     });
 
-    it('renders About modal displaying Version 1.1 and Created By Arsh DSJ', () => {
+    it('renders About modal displaying Version 1.2 and Created By Arsh DSJ', () => {
       const onClose = vi.fn();
       render(<AboutModal isOpen={true} onClose={onClose} />);
 
       expect(screen.getByText(/About/i)).toBeInTheDocument();
-      expect(screen.getByText(/Version 1\.1/i)).toBeInTheDocument();
+      expect(screen.getByText(/Version 1\.2/i)).toBeInTheDocument();
       expect(screen.getByText(/Created By/i)).toBeInTheDocument();
       expect(screen.getByText('Arsh DSJ')).toBeInTheDocument();
     });
 
-    it('renders About section in Help & Shortcuts modal displaying Version 1.1 and Created By Arsh DSJ', () => {
+    it('renders About section in Help & Shortcuts modal displaying Version 1.2 and Created By Arsh DSJ', () => {
       const onClose = vi.fn();
       render(<HelpShortcutsModal isOpen={true} onClose={onClose} />);
 
-      expect(screen.getByText('1.1')).toBeInTheDocument();
+      expect(screen.getByText('1.2')).toBeInTheDocument();
       expect(screen.getByText('Arsh DSJ')).toBeInTheDocument();
     });
   });

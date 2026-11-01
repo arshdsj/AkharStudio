@@ -100,6 +100,27 @@ export const ScreenplayCanvas = React.forwardRef<ProseMirrorEditorHandle, Screen
       setBlockType: (type) => {
         editorRef.current?.setBlockType(type);
       },
+      toggleFormat: (format) => {
+        editorRef.current?.toggleFormat(format);
+      },
+      toggleHighlight: (color) => {
+        editorRef.current?.toggleHighlight(color);
+      },
+      triggerFormatPainter: () => {
+        return editorRef.current?.triggerFormatPainter() ?? false;
+      },
+      isFormatPainterActive: () => {
+        return editorRef.current?.isFormatPainterActive() ?? false;
+      },
+      setLink: (url) => {
+        editorRef.current?.setLink(url);
+      },
+      setBlockAnnotation: (layer) => {
+        editorRef.current?.setBlockAnnotation(layer);
+      },
+      setBlockComment: (comment) => {
+        editorRef.current?.setBlockComment(comment);
+      },
     }));
 
     return (

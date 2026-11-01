@@ -44,10 +44,10 @@ describe('Phase 1: Project Lifecycle & Data Model (W1 & W1b)', () => {
       expect(project.title).toBe('Template Script');
       expect(project.metadata.title).toBe('Template Script');
 
-      // Drafts: exactly 1 draft, named 'Main Draft', isMain: true
+      // Drafts: exactly 1 draft, named 'Master Draft', isMain: true
       expect(project.drafts).toHaveLength(1);
       const mainDraft = project.drafts[0];
-      expect(mainDraft.name).toBe('Main Draft');
+      expect(mainDraft.name).toBe('Master Draft');
       expect(mainDraft.isMain).toBe(true);
 
       // Initial block: one empty Action block (MODEL-02)

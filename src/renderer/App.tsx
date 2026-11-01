@@ -91,6 +91,7 @@ export const App: React.FC = () => {
   const [isAltOrCtrlHeld, setIsAltOrCtrlHeld] = useState<boolean>(false);
   const [inputMode, setInputMode] = useState<'pa' | 'en'>('pa');
   const [isTitlePageExpanded, setIsTitlePageExpanded] = useState<boolean>(false);
+  const [formatPainterActive, setFormatPainterActive] = useState<boolean>(false);
   const [contdPrompt, setContdPrompt] = useState<{ isOpen: boolean; characterName: string }>({
     isOpen: false,
     characterName: '',
@@ -300,19 +301,9 @@ export const App: React.FC = () => {
     autosaveTimeoutRef.current = setTimeout(async () => {
       if (window.electronAPI) {
         try {
-          if (projectSource === 'database') {
-            setSaveStatus('saving');
-            await window.electronAPI.dbSaveProject(project);
-            setSaveStatus('clean');
-          } else if (currentFilePath) {
-            setSaveStatus('saving');
-            await window.electronAPI.saveProject(currentFilePath, project);
-            setSaveStatus('clean');
-          } else {
-            // Save volatile recovery snapshot for untitled project
-            await window.electronAPI.autosaveSnapshot(project);
-            setSaveStatus('dirty');
-          }
+          setSaveStatus('saving');
+          await window.electronAPI.dbSaveProject(project);
+          setSaveStatus('clean');
         } catch (err) {
           console.error('Autosave error:', err);
           setSaveStatus('error');
@@ -325,56 +316,31 @@ export const App: React.FC = () => {
         clearTimeout(autosaveTimeoutRef.current);
       }
     };
-  }, [project, projectSource, currentFilePath, saveStatus]);
+  }, [project, saveStatus]);
 
   // Actions
   const handleSave = useCallback(async () => {
     if (!window.electronAPI) return;
     try {
       setSaveStatus('saving');
-      if (projectSource === 'database') {
-        // Direct database save (Requirement 3: Cmd+S saves directly to local database, no file dialog)
-        await window.electronAPI.dbSaveProject(project);
-        setSaveStatus('clean');
-        const recents = await window.electronAPI.getRecentProjects();
-        setRecentProjects(recents);
-      } else if (currentFilePath) {
-        await window.electronAPI.saveProject(currentFilePath, project);
-        setSaveStatus('clean');
-        const recents = await window.electronAPI.getRecentProjects();
-        setRecentProjects(recents);
-      } else {
-        const filePath = await window.electronAPI.saveProjectDialog(project.title, project);
-        if (filePath) {
-          setCurrentFilePath(filePath);
-          setProjectSource('external');
-          setSaveStatus('clean');
-          const recents = await window.electronAPI.getRecentProjects();
-          setRecentProjects(recents);
-        } else {
-          setSaveStatus('dirty');
-        }
-      }
+      // Direct database save (Requirement 1: Database is single source of truth)
+      await window.electronAPI.dbSaveProject(project);
+      setSaveStatus('clean');
+      const recents = await window.electronAPI.getRecentProjects();
+      setRecentProjects(recents);
     } catch (err) {
       console.error('Save failed:', err);
       setSaveStatus('error');
     }
-  }, [project, projectSource, currentFilePath]);
+  }, [project]);
 
   const handleSaveAs = useCallback(async () => {
     if (!window.electronAPI) return;
     try {
-      const filePath = await window.electronAPI.saveProjectDialog(project.title, project);
-      if (filePath) {
-        setCurrentFilePath(filePath);
-        setProjectSource('external');
-        setSaveStatus('clean');
-        const recents = await window.electronAPI.getRecentProjects();
-        setRecentProjects(recents);
-      }
+      // External project files are strictly for export and sharing (Requirement 1)
+      await window.electronAPI.exportProjectBundleDialog(project.title, project);
     } catch (err) {
-      console.error('Save As failed:', err);
-      setSaveStatus('error');
+      console.error('Export failed:', err);
     }
   }, [project]);
 
@@ -415,8 +381,8 @@ export const App: React.FC = () => {
         setHistory([]);
         setFuture([]);
         setProject(result.project);
-        setCurrentFilePath(result.filePath);
-        setProjectSource('external');
+        setCurrentFilePath(null);
+        setProjectSource('database');
         setSaveStatus('clean');
         setIsWelcomeOpen(false);
         const recents = await window.electronAPI.getRecentProjects();
@@ -436,15 +402,17 @@ export const App: React.FC = () => {
           setHistory([]);
           setFuture([]);
           setProject(result.project);
-          setCurrentFilePath(result.filePath);
-          setProjectSource('external');
+          setCurrentFilePath(null);
+          setProjectSource('database');
           setSaveStatus('clean');
           setIsWelcomeOpen(false);
+          const recents = await window.electronAPI.getRecentProjects();
+          setRecentProjects(recents);
         }
         return;
       }
 
-      if (recentItem.source === 'database' || !recentItem.filePath) {
+      if (recentItem.id) {
         const loaded = await window.electronAPI.dbGetProject(recentItem.id);
         if (loaded) {
           setHistory([]);
@@ -454,17 +422,22 @@ export const App: React.FC = () => {
           setProjectSource('database');
           setSaveStatus('clean');
           setIsWelcomeOpen(false);
+          return;
         }
-      } else {
+      }
+
+      if (recentItem.filePath) {
         const result = await window.electronAPI.openRecentFile(recentItem.filePath);
         if (result) {
           setHistory([]);
           setFuture([]);
           setProject(result.project);
-          setCurrentFilePath(result.filePath);
-          setProjectSource('external');
+          setCurrentFilePath(null);
+          setProjectSource('database');
           setSaveStatus('clean');
           setIsWelcomeOpen(false);
+          const recents = await window.electronAPI.getRecentProjects();
+          setRecentProjects(recents);
         }
       }
     } catch (err) {
@@ -759,6 +732,8 @@ export const App: React.FC = () => {
         exportArea: options.exportArea,
         pageRanges,
         customDraft,
+        password: options.password,
+        preserveCharacterHighlights: options.preserveCharacterHighlights,
       });
       if (res.success) {
         console.log('PDF exported successfully to:', res.filePath);
@@ -859,13 +834,17 @@ export const App: React.FC = () => {
     try {
       const res = await window.electronAPI.importProjectBundleDialog();
       if (res && res.content) {
-        // STORE-02: import as new project with fresh IDs
+        // STORE-02: import as new project with fresh IDs and save into DB
         const newProj = importProjectBundle(res.content, true);
+        await window.electronAPI.dbSaveProject(newProj);
         setHistory([]);
         setFuture([]);
         setProject(newProj);
         setCurrentFilePath(null);
-        setSaveStatus('dirty');
+        setProjectSource('database');
+        setSaveStatus('clean');
+        const recents = await window.electronAPI.getRecentProjects();
+        setRecentProjects(recents);
       }
     } catch (err) {
       console.error('Import bundle failed:', err);
@@ -1011,7 +990,30 @@ export const App: React.FC = () => {
           handleRedo();
           editorRef.current?.focus();
         }}
-        onApplyFormat={() => {
+        onApplyFormat={(fmt) => {
+          editorRef.current?.toggleFormat(fmt);
+          editorRef.current?.focus();
+        }}
+        onHighlight={() => {
+          editorRef.current?.toggleHighlight();
+          editorRef.current?.focus();
+        }}
+        onFormatPainter={() => {
+          const active = editorRef.current?.triggerFormatPainter();
+          setFormatPainterActive(Boolean(active));
+          editorRef.current?.focus();
+        }}
+        isFormatPainterActive={formatPainterActive}
+        onLink={(url) => {
+          editorRef.current?.setLink(url);
+          editorRef.current?.focus();
+        }}
+        onAddAnnotationLayer={(layer) => {
+          editorRef.current?.setBlockAnnotation(layer);
+          editorRef.current?.focus();
+        }}
+        onComment={(comment) => {
+          editorRef.current?.setBlockComment(comment);
           editorRef.current?.focus();
         }}
         onToggleCase={() => {

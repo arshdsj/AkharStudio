@@ -40,6 +40,12 @@ interface FloatingToolbarProps {
   onToggleCase: () => void;
   onCopy: () => void;
   onSelectBlockType: (type: ScreenplayBlockType) => void;
+  onHighlight?: () => void;
+  onFormatPainter?: () => void;
+  isFormatPainterActive?: boolean;
+  onLink?: (url: string) => void;
+  onAddAnnotationLayer?: (layer: string) => void;
+  onComment?: (comment: string) => void;
   isKeyboardOpen?: boolean;
   onToggleKeyboard?: () => void;
   onKeepFocus?: () => void;
@@ -56,11 +62,22 @@ export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
   onToggleCase,
   onCopy,
   onSelectBlockType,
+  onHighlight,
+  onFormatPainter,
+  isFormatPainterActive = false,
+  onLink,
+  onAddAnnotationLayer,
+  onComment,
   isKeyboardOpen = false,
   onToggleKeyboard,
   onKeepFocus,
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isLinkOpen, setIsLinkOpen] = useState(false);
+  const [linkUrl, setLinkUrl] = useState('');
+  const [isLayersOpen, setIsLayersOpen] = useState(false);
+  const [isCommentOpen, setIsCommentOpen] = useState(false);
+  const [commentText, setCommentText] = useState('');
 
   const preventFocusLoss = (e: React.SyntheticEvent) => {
     e.preventDefault();
@@ -302,38 +319,120 @@ export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
       {/* Divider */}
       <div style={{ width: '1px', height: '14px', background: 'var(--line-separator)', margin: '0 2px' }} />
 
-      {/* 10. Highlight (Honest disabled for P1) */}
+      {/* 10. Highlight */}
       <button
         type="button"
-        disabled
-        title="Highlight (Coming in V1.1)"
+        onMouseDown={preventFocusLoss}
+        onPointerDown={preventFocusLoss}
+        onClick={() => {
+          onHighlight?.();
+          onKeepFocus?.();
+        }}
+        title="Highlight Selected Text"
         className="ds-icon-btn"
-        aria-disabled="true"
       >
         <Highlighter size={15} />
       </button>
 
-      {/* 11. Format Painter (Disabled for P1) */}
+      {/* 11. Format Painter */}
       <button
         type="button"
-        disabled
-        title="Format Painter (Coming in V1.1)"
+        onMouseDown={preventFocusLoss}
+        onPointerDown={preventFocusLoss}
+        onClick={() => {
+          onFormatPainter?.();
+          onKeepFocus?.();
+        }}
+        title={
+          isFormatPainterActive
+            ? 'Format Painter Active (Click or select text to paste format)'
+            : 'Format Painter (Copy text formatting)'
+        }
         className="ds-icon-btn"
-        aria-disabled="true"
+        style={
+          isFormatPainterActive
+            ? { background: 'var(--accent-fill)', color: 'var(--text-on-accent)' }
+            : undefined
+        }
       >
         <Paintbrush size={15} />
       </button>
 
-      {/* 12. Link (Disabled for P1) */}
-      <button
-        type="button"
-        disabled
-        title="Link (Coming in V1.1)"
-        className="ds-icon-btn"
-        aria-disabled="true"
-      >
-        <Link size={15} />
-      </button>
+      {/* 12. Link */}
+      <div className="relative">
+        <button
+          type="button"
+          onMouseDown={preventFocusLoss}
+          onPointerDown={preventFocusLoss}
+          onClick={() => {
+            setIsLinkOpen((prev) => !prev);
+            setIsLayersOpen(false);
+            setIsCommentOpen(false);
+          }}
+          title="Insert or Edit Link"
+          className="ds-icon-btn"
+          style={isLinkOpen ? { background: 'var(--surface-selected)', color: 'var(--text-accent)' } : undefined}
+        >
+          <Link size={15} />
+        </button>
+
+        {isLinkOpen && (
+          <div
+            className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 p-2.5 rounded-lg select-none shadow-2xl flex flex-col gap-2 z-50 animate-in fade-in"
+            style={{
+              width: '240px',
+              backgroundColor: 'var(--surface-overlay)',
+              border: '1px solid var(--line-separator)',
+              boxShadow: 'var(--shadow-overlay), inset 0 1px 0 var(--line-edge)',
+              color: 'var(--text-primary)',
+            }}
+          >
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400">Insert Link</span>
+            <input
+              type="text"
+              placeholder="https://example.com or #scene"
+              value={linkUrl}
+              onChange={(e) => setLinkUrl(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  onLink?.(linkUrl);
+                  setIsLinkOpen(false);
+                  onKeepFocus?.();
+                } else if (e.key === 'Escape') {
+                  setIsLinkOpen(false);
+                  onKeepFocus?.();
+                }
+              }}
+              className="ds-input text-xs"
+              autoFocus
+            />
+            <div className="flex justify-end gap-1.5 mt-1">
+              <button
+                type="button"
+                className="ds-btn text-xs px-2 py-1"
+                onClick={() => {
+                  onLink?.('');
+                  setIsLinkOpen(false);
+                  onKeepFocus?.();
+                }}
+              >
+                Remove
+              </button>
+              <button
+                type="button"
+                className="ds-btn ds-btn--primary text-xs px-2 py-1"
+                onClick={() => {
+                  onLink?.(linkUrl);
+                  setIsLinkOpen(false);
+                  onKeepFocus?.();
+                }}
+              >
+                Apply
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Punjabi Virtual Keyboard */}
       {onToggleKeyboard && (
@@ -371,27 +470,146 @@ export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
       {/* Divider */}
       <div style={{ width: '1px', height: '14px', background: 'var(--line-separator)', margin: '0 2px' }} />
 
-      {/* 14. Add Layer (Disabled for P1) */}
-      <button
-        type="button"
-        disabled
-        title="Add Annotation Layer (Coming in V1.1)"
-        className="ds-icon-btn"
-        aria-disabled="true"
-      >
-        <Layers size={15} />
-      </button>
+      {/* 14. Add Layer */}
+      <div className="relative">
+        <button
+          type="button"
+          onMouseDown={preventFocusLoss}
+          onPointerDown={preventFocusLoss}
+          onClick={() => {
+            setIsLayersOpen((prev) => !prev);
+            setIsLinkOpen(false);
+            setIsCommentOpen(false);
+          }}
+          title="Annotation & Revision Layer"
+          className="ds-icon-btn"
+          style={
+            isLayersOpen || activeBlock?.annotationLayer
+              ? { background: 'var(--surface-selected)', color: 'var(--text-accent)' }
+              : undefined
+          }
+        >
+          <Layers size={15} />
+        </button>
 
-      {/* 15. Comment (Disabled for P1) */}
-      <button
-        type="button"
-        disabled
-        title="Comment Thread (Coming in V1.1)"
-        className="ds-icon-btn"
-        aria-disabled="true"
-      >
-        <MessageSquare size={15} />
-      </button>
+        {isLayersOpen && (
+          <div
+            className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 p-1.5 rounded-lg select-none shadow-2xl flex flex-col gap-0.5 z-50 animate-in fade-in"
+            style={{
+              width: '180px',
+              backgroundColor: 'var(--surface-overlay)',
+              border: '1px solid var(--line-separator)',
+              boxShadow: 'var(--shadow-overlay), inset 0 1px 0 var(--line-edge)',
+              color: 'var(--text-primary)',
+            }}
+          >
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400 px-2 py-1">Layer Tag</span>
+            {['Director Note', 'VFX / Stunt', 'Sound / Music', 'Production', 'Polish / Revision'].map((layer) => (
+              <button
+                key={layer}
+                type="button"
+                className="ds-row text-xs px-2 py-1.5 rounded flex items-center justify-between text-left"
+                style={activeBlock?.annotationLayer === layer ? { background: 'var(--surface-selected)', color: 'var(--text-accent)' } : undefined}
+                onClick={() => {
+                  onAddAnnotationLayer?.(layer);
+                  setIsLayersOpen(false);
+                  onKeepFocus?.();
+                }}
+              >
+                <span>{layer}</span>
+              </button>
+            ))}
+            {activeBlock?.annotationLayer && (
+              <button
+                type="button"
+                className="ds-row text-xs px-2 py-1 rounded text-red-400 hover:text-red-300 mt-0.5"
+                onClick={() => {
+                  onAddAnnotationLayer?.('');
+                  setIsLayersOpen(false);
+                  onKeepFocus?.();
+                }}
+              >
+                Clear Layer
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* 15. Comment */}
+      <div className="relative">
+        <button
+          type="button"
+          onMouseDown={preventFocusLoss}
+          onPointerDown={preventFocusLoss}
+          onClick={() => {
+            setCommentText(activeBlock?.comment || activeBlock?.notes || '');
+            setIsCommentOpen((prev) => !prev);
+            setIsLinkOpen(false);
+            setIsLayersOpen(false);
+          }}
+          title="Script Notes & Comments"
+          className="ds-icon-btn"
+          style={
+            isCommentOpen || activeBlock?.comment || activeBlock?.notes
+              ? { background: 'var(--surface-selected)', color: 'var(--text-accent)' }
+              : undefined
+          }
+        >
+          <MessageSquare size={15} />
+        </button>
+
+        {isCommentOpen && (
+          <div
+            className="absolute bottom-full mb-3 right-0 p-2.5 rounded-lg select-none shadow-2xl flex flex-col gap-2 z-50 animate-in fade-in"
+            style={{
+              width: '260px',
+              backgroundColor: 'var(--surface-overlay)',
+              border: '1px solid var(--line-separator)',
+              boxShadow: 'var(--shadow-overlay), inset 0 1px 0 var(--line-edge)',
+              color: 'var(--text-primary)',
+            }}
+          >
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400">Script Note / ਟਿੱਪਣੀ</span>
+            <textarea
+              rows={3}
+              placeholder="Write a screenplay note or editorial feedback..."
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value)}
+              className="ds-input text-xs resize-none p-2 h-auto"
+              autoFocus
+            />
+            <div className="flex justify-between items-center mt-1">
+              {activeBlock?.comment || activeBlock?.notes ? (
+                <button
+                  type="button"
+                  className="text-xs text-red-400 hover:text-red-300"
+                  onClick={() => {
+                    onComment?.('');
+                    setIsCommentOpen(false);
+                    onKeepFocus?.();
+                  }}
+                >
+                  Delete
+                </button>
+              ) : (
+                <div />
+              )}
+              <button
+                type="button"
+                className="ds-btn ds-btn--primary text-xs px-2.5 py-1"
+                onClick={() => {
+                  onComment?.(commentText);
+                  setIsCommentOpen(false);
+                  onKeepFocus?.();
+                }}
+              >
+                Save Note
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

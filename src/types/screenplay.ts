@@ -13,10 +13,11 @@ export type ScreenplayBlockType =
   | 'shot';
 
 export interface InlineFormat {
-  type: 'bold' | 'italic' | 'underline' | 'strikethrough' | 'color';
+  type: 'bold' | 'italic' | 'underline' | 'strikethrough' | 'color' | 'highlight' | 'link';
   from: number;
   to: number;
   color?: string;
+  href?: string;
 }
 
 export interface ScreenplayBlock {
@@ -25,6 +26,8 @@ export interface ScreenplayBlock {
   text: string;
   formats?: InlineFormat[];
   notes?: string;
+  comment?: string;
+  annotationLayer?: string;
 }
 
 export interface TitleMetadata {

@@ -77,24 +77,24 @@ describe('Phase 1 UI Components (W1b Acceptance Gates)', () => {
       // 6. Aa
       expect(screen.getByTitle(/Toggle Case/i)).toBeInTheDocument();
 
-      // 7. P1 Deferred Features: Honest Disabled States (Highlight, Format Painter, Link, Add Layer, Comment)
-      const highlightBtn = screen.getByTitle(/Highlight \(Coming in V1.1\)/i);
-      expect(highlightBtn).toBeDisabled();
+      // 7. Full Features (Highlight, Format Painter, Link, Add Layer, Comment)
+      const highlightBtn = screen.getByTitle(/Highlight Selected Text/i);
+      expect(highlightBtn).not.toBeDisabled();
 
-      const painterBtn = screen.getByTitle(/Format Painter \(Coming in V1.1\)/i);
-      expect(painterBtn).toBeDisabled();
+      const painterBtn = screen.getByTitle(/Format Painter/i);
+      expect(painterBtn).not.toBeDisabled();
 
-      const linkBtn = screen.getByTitle(/Link \(Coming in V1.1\)/i);
-      expect(linkBtn).toBeDisabled();
+      const linkBtn = screen.getByTitle(/Insert or Edit Link/i);
+      expect(linkBtn).not.toBeDisabled();
 
       const copyBtn = screen.getByTitle(/Copy Selected Text/i);
       expect(copyBtn).not.toBeDisabled();
 
-      const layerBtn = screen.getByTitle(/Add Annotation Layer \(Coming in V1.1\)/i);
-      expect(layerBtn).toBeDisabled();
+      const layerBtn = screen.getByTitle(/Annotation & Revision Layer/i);
+      expect(layerBtn).not.toBeDisabled();
 
-      const commentBtn = screen.getByTitle(/Comment Thread \(Coming in V1.1\)/i);
-      expect(commentBtn).toBeDisabled();
+      const commentBtn = screen.getByTitle(/Script Notes & Comments/i);
+      expect(commentBtn).not.toBeDisabled();
     });
 
     it('visibly disables element selector and alignment during title editing (TITLE-02)', () => {
@@ -200,7 +200,7 @@ describe('Phase 1 UI Components (W1b Acceptance Gates)', () => {
       const drafts: ScriptDraft[] = [
         {
           id: 'draft_1',
-          name: 'Main Draft',
+          name: 'Master Draft',
           isMain: true,
           createdAt: '',
           modifiedAt: '',
@@ -238,7 +238,7 @@ describe('Phase 1 UI Components (W1b Acceptance Gates)', () => {
         />
       );
 
-      expect(screen.getByText('Main Draft')).toBeInTheDocument();
+      expect(screen.getByText('Master Draft')).toBeInTheDocument();
       expect(screen.getByText('Revision 2')).toBeInTheDocument();
 
       // Paper toggle
@@ -262,7 +262,7 @@ describe('Phase 1 UI Components (W1b Acceptance Gates)', () => {
   describe('LeftSidebar: Language Switch & Settings Panel', () => {
     const dummyDraft: ScriptDraft = {
       id: 'd1',
-      name: 'Main Draft',
+      name: 'Master Draft',
       isMain: true,
       createdAt: '',
       modifiedAt: '',

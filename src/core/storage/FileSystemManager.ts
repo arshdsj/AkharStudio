@@ -16,7 +16,10 @@ export class FileSystemManager {
 
   constructor(baseUserDataDir?: string) {
     const homeDir = process.env.HOME || process.env.USERPROFILE || '.';
-    this.configDir = baseUserDataDir || path.join(homeDir, '.punjabi-script-writer');
+    const legacyDir = path.join(homeDir, '.punjabi-script-writer');
+    const newDir = path.join(homeDir, '.akhar-studio');
+    const defaultDir = fs.existsSync(legacyDir) && !fs.existsSync(newDir) ? legacyDir : newDir;
+    this.configDir = baseUserDataDir || defaultDir;
     this.recoveryDir = path.join(this.configDir, 'recovery');
     this.recentProjectsFile = path.join(this.configDir, 'recent-projects.json');
     this.recoveryFile = path.join(this.recoveryDir, 'recovery_snapshot.json');

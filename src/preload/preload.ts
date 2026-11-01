@@ -52,6 +52,8 @@ export interface ElectronAPI {
     exportArea?: 'entire_script' | 'selected_pages' | 'highlighted_text' | 'character_sheet';
     pageRanges?: string;
     customDraft?: ScriptDraft;
+    password?: string;
+    preserveCharacterHighlights?: boolean;
   }) => Promise<ExportResult>;
   exportTextFile: (defaultTitle: string, content: string) => Promise<ExportResult>;
   exportFountainFile: (defaultTitle: string, content: string) => Promise<ExportResult>;

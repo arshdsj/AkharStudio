@@ -8,7 +8,7 @@
  * - Minor bug fixes and small refinements do not increment major version
  */
 
-export const APP_VERSION = '1.1';
+export const APP_VERSION = '1.2';
 export const APP_AUTHOR = 'Arsh DSJ';
 export const APP_NAME = 'AkharStudio';
 export const APP_NAME_PUNJABI = 'ਅੱਖਰStudio';

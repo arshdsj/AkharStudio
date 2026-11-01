@@ -24,7 +24,7 @@ export function generateId(): string {
 
 /**
  * Create a fresh default project (MODEL-02, T-01)
- * Default document: project title "Template Script", ✧ Main Draft, title card, one focused empty Action block
+ * Default document: project title "Template Script", ✧ Master Draft, title card, one focused empty Action block
  */
 export function createDefaultProject(): ScriptProject {
   const mainDraftId = generateId();
@@ -32,7 +32,7 @@ export function createDefaultProject(): ScriptProject {
 
   const mainDraft: ScriptDraft = {
     id: mainDraftId,
-    name: 'Main Draft',
+    name: 'Master Draft',
     isMain: true,
     createdAt: new Date().toISOString(),
     modifiedAt: new Date().toISOString(),

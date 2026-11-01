@@ -207,13 +207,14 @@ export const ScreenplayElementMenu: React.FC<ScreenplayElementMenuProps> = ({
       aria-label="Screenplay Elements"
       onMouseDown={(e) => e.preventDefault()}
       onPointerDown={(e) => e.preventDefault()}
-      className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 z-50 flex flex-col p-1.5 rounded-lg select-none shadow-2xl transition-all"
+      className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 z-50 flex flex-col p-1.5 select-none transition-all"
       style={{
-        width: '196px',
-        backgroundColor: '#f8fafc',
-        border: '1px solid #cbd5e1',
-        boxShadow: '0 12px 32px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 0, 0, 0.15)',
-        color: '#1e293b',
+        width: '204px',
+        backgroundColor: 'var(--surface-overlay)',
+        border: '1px solid var(--line-separator)',
+        boxShadow: 'var(--shadow-overlay), inset 0 1px 0 var(--line-edge)',
+        borderRadius: 'var(--radius-md)',
+        color: 'var(--text-primary)',
       }}
     >
       {SCREENPLAY_ELEMENT_OPTIONS.map((opt) => {
@@ -233,19 +234,20 @@ export const ScreenplayElementMenu: React.FC<ScreenplayElementMenuProps> = ({
             }}
             className="flex items-center justify-between w-full px-2.5 py-1.5 rounded-md text-left transition-colors cursor-pointer group"
             style={{
-              backgroundColor: isSelected ? '#e2e8f0' : 'transparent',
-              color: isSelected ? '#0f172a' : '#334155',
+              backgroundColor: isSelected ? 'var(--surface-selected)' : 'transparent',
+              color: isSelected ? 'var(--text-accent)' : 'var(--text-primary)',
+              borderRadius: 'var(--radius-sm)',
             }}
             onMouseEnter={(e) => {
               if (!isSelected) {
-                e.currentTarget.style.backgroundColor = '#f1f5f9';
-                e.currentTarget.style.color = '#0f172a';
+                e.currentTarget.style.backgroundColor = 'var(--surface-hover)';
+                e.currentTarget.style.color = 'var(--text-primary)';
               }
             }}
             onMouseLeave={(e) => {
               if (!isSelected) {
                 e.currentTarget.style.backgroundColor = 'transparent';
-                e.currentTarget.style.color = '#334155';
+                e.currentTarget.style.color = 'var(--text-primary)';
               }
             }}
           >
@@ -253,14 +255,14 @@ export const ScreenplayElementMenu: React.FC<ScreenplayElementMenuProps> = ({
             <div className="flex items-center gap-2.5 min-w-0">
               <span
                 style={{
-                  color: isSelected ? '#0f172a' : '#475569',
+                  color: isSelected ? 'var(--text-accent)' : 'var(--text-secondary)',
                 }}
               >
                 {opt.icon}
               </span>
               <span
                 className={`text-[13px] truncate ${
-                  isSelected ? 'font-semibold' : 'font-medium'
+                  isSelected ? 'font-semibold' : 'font-normal'
                 }`}
               >
                 {opt.label}
@@ -269,9 +271,9 @@ export const ScreenplayElementMenu: React.FC<ScreenplayElementMenuProps> = ({
 
             {/* Right: Shortcut badge */}
             <span
-              className="text-[12px] font-mono tracking-tight shrink-0 ml-2"
+              className="text-[11px] font-mono tracking-tight shrink-0 ml-2"
               style={{
-                color: isSelected ? '#475569' : '#94a3b8',
+                color: isSelected ? 'var(--text-accent)' : 'var(--text-disabled)',
               }}
             >
               {cmdSymbol} {opt.shortcutNumber}

@@ -14,6 +14,9 @@ import { generateScreenplayHtml, generateCharacterSheetHtml } from '../core/expo
 import { exportProjectBundle } from '../core/storage/projectBundle';
 import { APP_VERSION, APP_AUTHOR, APP_FULL_NAME } from '../core/version';
 
+app.name = 'AkharStudio';
+app.setName('AkharStudio');
+
 let mainWindow: BrowserWindow | null = null;
 const userDataPath = app.getPath('userData');
 const fsManager = new FileSystemManager(userDataPath);
@@ -70,13 +73,12 @@ function setupApplicationMenu() {
     ...(isMac
       ? [
           {
-            label: app.name,
+            label: 'AkharStudio',
             submenu: [
               {
                 label: `About ${APP_FULL_NAME}`,
                 click: () => mainWindow?.webContents.send('menu:about'),
               },
-              { role: 'about' as const },
               { type: 'separator' as const },
               { role: 'services' as const },
               { type: 'separator' as const },
@@ -222,19 +224,31 @@ ipcMain.handle('storage:open-file-dialog', async () => {
 
   const filePath = result.filePaths[0];
   const project = await fsManager.openProject(filePath);
+  // Database-First: Immediately import into internal SQLite database
+  dbManager.saveProject(project);
   dbManager.recordExternalFile(filePath, project.title, project.id);
   return { filePath, project };
 });
 
 ipcMain.handle('storage:open-recent-file', async (_event, filePath: string) => {
   const project = await fsManager.openProject(filePath);
+  // Database-First: Immediately import into internal SQLite database
+  dbManager.saveProject(project);
   dbManager.recordExternalFile(filePath, project.title, project.id);
   return { filePath, project };
 });
 
 ipcMain.handle('storage:save-project', async (_event, filePath: string, project: ScriptProject) => {
-  await fsManager.saveProjectAtomic(filePath, project);
-  dbManager.recordExternalFile(filePath, project.title, project.id);
+  // Always update database as single source of truth
+  dbManager.saveProject(project);
+  if (filePath) {
+    try {
+      await fsManager.saveProjectAtomic(filePath, project);
+      dbManager.recordExternalFile(filePath, project.title, project.id);
+    } catch {
+      // ignore external file write error if detached
+    }
+  }
   return true;
 });
 
@@ -366,6 +380,8 @@ ipcMain.handle(
       exportArea?: 'entire_script' | 'selected_pages' | 'highlighted_text' | 'character_sheet';
       pageRanges?: string;
       customDraft?: ScriptDraft;
+      password?: string;
+      preserveCharacterHighlights?: boolean;
     }
   ) => {
     if (!mainWindow) return { canceled: true };
@@ -420,6 +436,8 @@ ipcMain.handle(
         includeTitlePage: includeTitle,
         courierFontBase64,
         gurmukhiFontBase64,
+        highlightCharacters: snapshotProject.settings?.highlightCharacters,
+        preserveCharacterHighlights: options.preserveCharacterHighlights,
       });
     }
 
@@ -451,8 +469,26 @@ ipcMain.handle(
 
       const pdfBuffer = await printWindow.webContents.printToPDF(printOptions);
 
+      let finalBuffer: Buffer = pdfBuffer;
+      if (options.password && typeof options.password === 'string' && options.password.trim().length > 0) {
+        try {
+          const { PDFDocument } = await import('@cantoo/pdf-lib');
+          const pdfDoc = await PDFDocument.load(pdfBuffer);
+          const pwd = options.password.trim();
+          pdfDoc.encrypt({
+            userPassword: pwd,
+            ownerPassword: pwd,
+          });
+          const encryptedBytes = await pdfDoc.save();
+          finalBuffer = Buffer.from(encryptedBytes);
+        } catch (encErr) {
+          console.error('PDF Encryption failed:', encErr);
+          throw new Error(`Failed to apply password to exported PDF: ${encErr instanceof Error ? encErr.message : String(encErr)}`);
+        }
+      }
+
       // Write atomically to file
-      await fs.promises.writeFile(result.filePath, pdfBuffer);
+      await fs.promises.writeFile(result.filePath, finalBuffer);
       return { success: true, filePath: result.filePath };
     } finally {
       printWindow.close();

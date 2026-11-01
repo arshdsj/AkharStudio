@@ -411,7 +411,7 @@ describe('Phase 2: Screenplay Block Editor Core (Package W2)', () => {
     it('converts ScriptDraft to ProseMirror and back preserving block IDs and Unicode text', () => {
       const originalDraft: ScriptDraft = {
         id: 'draft_main',
-        name: 'Main Draft',
+        name: 'Master Draft',
         isMain: true,
         createdAt: '2026-10-29T22:00:00Z',
         modifiedAt: '2026-10-29T22:00:00Z',

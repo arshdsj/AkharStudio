@@ -34,6 +34,10 @@ export function draftToProseMirrorDoc(draft: ScriptDraft): PMNode {
             if (f.from <= segStart && f.to >= segEnd) {
               if (f.type === 'color' && f.color) {
                 segMarks.push(screenplaySchema.marks.color.create({ color: f.color }));
+              } else if (f.type === 'highlight') {
+                segMarks.push(screenplaySchema.marks.highlight.create({ color: f.color || 'rgba(234, 179, 8, 0.35)' }));
+              } else if (f.type === 'link' && f.href) {
+                segMarks.push(screenplaySchema.marks.link.create({ href: f.href, title: f.color || null }));
               } else if (screenplaySchema.marks[f.type]) {
                 segMarks.push(screenplaySchema.marks[f.type].create());
               }
@@ -51,6 +55,8 @@ export function draftToProseMirrorDoc(draft: ScriptDraft): PMNode {
         id: block.id || generateId(),
         type: block.type,
         contd: false,
+        annotation: block.annotationLayer || '',
+        comment: block.comment || block.notes || '',
       },
       textNodes.length > 0 ? textNodes : undefined
     );
@@ -96,6 +102,20 @@ export function proseMirrorDocToDraft(doc: PMNode, originalDraft: ScriptDraft): 
                 to,
                 color: mark.attrs.color,
               });
+            } else if (mark.type.name === 'highlight') {
+              formats.push({
+                type: 'highlight',
+                from,
+                to,
+                color: mark.attrs.color,
+              });
+            } else if (mark.type.name === 'link') {
+              formats.push({
+                type: 'link',
+                from,
+                to,
+                href: mark.attrs.href,
+              });
             } else if (['bold', 'italic', 'underline', 'strikethrough'].includes(mark.type.name)) {
               formats.push({
                 type: mark.type.name as any,
@@ -108,11 +128,15 @@ export function proseMirrorDocToDraft(doc: PMNode, originalDraft: ScriptDraft): 
         }
       });
 
+      const origBlock = originalDraft?.blocks?.find((b) => b.id === id);
       blocks.push({
         id,
         type,
         text,
         formats: formats.length > 0 ? formats : undefined,
+        notes: origBlock?.notes,
+        comment: child.attrs.comment || origBlock?.comment || origBlock?.notes || undefined,
+        annotationLayer: child.attrs.annotation || origBlock?.annotationLayer || undefined,
       });
     }
   });

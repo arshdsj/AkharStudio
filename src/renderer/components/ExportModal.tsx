@@ -14,6 +14,8 @@ export interface ExportPdfOptions {
   exportArea: ExportArea;
   pageRange?: { from: number; to: number };
   highlightedBlocks?: ScreenplayBlock[];
+  password?: string;
+  preserveCharacterHighlights?: boolean;
 }
 
 interface ExportModalProps {
@@ -33,6 +35,7 @@ interface ExportModalProps {
 export const ExportModal: React.FC<ExportModalProps> = ({
   isOpen,
   onClose,
+  project,
   currentPaperSize,
   totalPages = 1,
   highlightedBlocks = null,
@@ -47,6 +50,13 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   const [exportArea, setExportArea] = useState<ExportArea>('entire_script');
   const [fromPage, setFromPage] = useState<number>(1);
   const [toPage, setToPage] = useState<number>(Math.max(1, totalPages));
+  const [isPasswordProtected, setIsPasswordProtected] = useState<boolean>(false);
+  const [password, setPassword] = useState<string>('');
+  const [confirmPassword, setConfirmPassword] = useState<string>('');
+  const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [preserveCharacterHighlights, setPreserveCharacterHighlights] = useState<boolean>(() => {
+    return Boolean(project?.settings?.highlightCharacters?.enabled);
+  });
 
   useEffect(() => {
     setPaperSize(currentPaperSize);
@@ -57,8 +67,13 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       setFromPage(1);
       setToPage(Math.max(1, totalPages));
       setExportArea('entire_script');
+      setIsPasswordProtected(false);
+      setPassword('');
+      setConfirmPassword('');
+      setShowPassword(false);
+      setPreserveCharacterHighlights(Boolean(project?.settings?.highlightCharacters?.enabled));
     }
-  }, [isOpen, totalPages]);
+  }, [isOpen, totalPages, project?.settings?.highlightCharacters?.enabled]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -87,6 +102,17 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     }
   }
 
+  // Validation for password protection
+  let passwordError = '';
+  const isPasswordValid = !isPasswordProtected || (password.trim().length > 0 && password === confirmPassword);
+  if (isPasswordProtected) {
+    if (!password.trim()) {
+      passwordError = 'Please enter a password.';
+    } else if (password !== confirmPassword) {
+      passwordError = 'Passwords do not match.';
+    }
+  }
+
   // Validation for highlighted text
   const hasSelectedText = Boolean(
     highlightedBlocks &&
@@ -94,11 +120,11 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       highlightedBlocks.some((b) => b.text && b.text.trim().length > 0)
   );
 
-  let canExport = true;
+  let canExport = isPasswordValid;
   if (exportArea === 'selected_pages') {
-    canExport = isPageRangeValid;
+    canExport = canExport && isPageRangeValid;
   } else if (exportArea === 'highlighted_text') {
-    canExport = hasSelectedText;
+    canExport = canExport && hasSelectedText;
   }
 
   return (
@@ -272,6 +298,81 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               </label>
             )}
 
+            {/* Preserve Character Highlights in PDF (Requirement 4) */}
+            {project?.settings?.highlightCharacters?.enabled && (
+              <label className="ds-check">
+                <input
+                  type="checkbox"
+                  checked={preserveCharacterHighlights}
+                  onChange={(e) => setPreserveCharacterHighlights(e.target.checked)}
+                />
+                <span className="ds-check__box" />
+                <span>Preserve character highlights in PDF</span>
+              </label>
+            )}
+
+            {/* Password-Protected PDF Option (Requirement 5) */}
+            <div className="ds-field pt-1">
+              <label className="ds-check">
+                <input
+                  type="checkbox"
+                  checked={isPasswordProtected}
+                  onChange={(e) => {
+                    setIsPasswordProtected(e.target.checked);
+                    if (!e.target.checked) {
+                      setPassword('');
+                      setConfirmPassword('');
+                    }
+                  }}
+                />
+                <span className="ds-check__box" />
+                <span>Password-protect this PDF</span>
+              </label>
+
+              {isPasswordProtected && (
+                <div
+                  className="flex flex-col gap-2 mt-2 p-2.5 rounded"
+                  style={{ background: 'var(--surface-sunken)', border: '1px solid var(--line-separator)' }}
+                >
+                  <div>
+                    <span className="text-[11px] font-medium text-neutral-400 block mb-1">Set Password</span>
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="Enter password..."
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="ds-input text-xs"
+                      autoFocus
+                    />
+                  </div>
+                  <div>
+                    <span className="text-[11px] font-medium text-neutral-400 block mb-1">Confirm Password</span>
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="Confirm password..."
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="ds-input text-xs"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between pt-0.5">
+                    <label className="ds-check text-xs cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={showPassword}
+                        onChange={(e) => setShowPassword(e.target.checked)}
+                      />
+                      <span className="ds-check__box" />
+                      <span className="text-xs">Show password</span>
+                    </label>
+                    {passwordError && (
+                      <span className="text-xs text-red-400 font-medium">{passwordError}</span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
             <p className="ds-help">
               Set in Noto Sans Gurmukhi and Courier. Fonts are embedded, nothing to install.
             </p>
@@ -362,6 +463,8 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                 exportArea,
                 pageRange: exportArea === 'selected_pages' ? { from: fromPage, to: toPage } : undefined,
                 highlightedBlocks: exportArea === 'highlighted_text' ? (highlightedBlocks || []) : undefined,
+                password: isPasswordProtected ? password.trim() : undefined,
+                preserveCharacterHighlights,
               });
               onClose();
             }}

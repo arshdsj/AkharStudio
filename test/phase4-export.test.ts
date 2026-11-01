@@ -32,7 +32,7 @@ describe('Phase 4: Certified Export & Interchange (W4 & W5b)', () => {
 
     const draft: ScriptDraft = {
       id: 'd_test_p4',
-      name: 'Main Draft',
+      name: 'Master Draft',
       isMain: true,
       createdAt: '2026-10-29T10:00:00.000Z',
       modifiedAt: '2026-10-29T10:00:00.000Z',

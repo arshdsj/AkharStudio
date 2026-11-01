@@ -3,13 +3,16 @@
  * Baseline: V9.1, PAGE-01, PAGE-02, PAGE-03, ARCH-04, EXPORT-01, DEC-014
  */
 
-import { PaperSize, ScriptDraft, TitleMetadata } from '../../types/screenplay';
+import { PaperSize, ScriptDraft, TitleMetadata, HighlightCharactersSetting } from '../../types/screenplay';
+import { normalizeCharacterName } from '../editor/contd';
 
 export interface PdfExportOptions {
   paperSize: PaperSize;
   includeTitlePage: boolean;
   courierFontBase64?: string;
   gurmukhiFontBase64?: string;
+  highlightCharacters?: HighlightCharactersSetting;
+  preserveCharacterHighlights?: boolean;
 }
 
 export interface PageGeometry {
@@ -104,28 +107,67 @@ export function generateScreenplayHtml(
     `
     : '';
 
+  const highlightCfg = options.highlightCharacters;
+  const isHighlightActive = Boolean(
+    highlightCfg &&
+    highlightCfg.enabled &&
+    highlightCfg.selectedCharacters &&
+    highlightCfg.selectedCharacters.length > 0 &&
+    options.preserveCharacterHighlights !== false
+  );
+
+  const selectedCharSet = isHighlightActive
+    ? new Set(highlightCfg!.selectedCharacters.map((c) => c.toUpperCase().trim()))
+    : new Set<string>();
+  const highlightColor = highlightCfg?.color || 'rgba(167, 139, 250, 0.35)';
+
+  let currentSpeaker: string | null = null;
+
   // Render screenplay blocks with strict layout metrics (PAGE-02, ARCH-04)
   const blocksHtml = draft.blocks
     .map((block) => {
       const escapedText = escapeHtml(block.text);
 
+      let isHighlighted = false;
+      if (isHighlightActive) {
+        if (block.type === 'scene_heading') {
+          currentSpeaker = null;
+        } else if (block.type === 'character') {
+          const charName = normalizeCharacterName(block.text);
+          if (charName && selectedCharSet.has(charName)) {
+            currentSpeaker = charName;
+            isHighlighted = true;
+          } else {
+            currentSpeaker = null;
+          }
+        } else if (currentSpeaker && (block.type === 'dialogue' || block.type === 'parenthetical')) {
+          isHighlighted = true;
+        } else {
+          currentSpeaker = null;
+        }
+      }
+
+      const content = isHighlighted && escapedText
+        ? `<span class="character-highlight" style="background-color: ${highlightColor}; -webkit-print-color-adjust: exact; print-color-adjust: exact; border-radius: 2px; padding: 1px 3px;">${escapedText}</span>`
+        : escapedText;
+
       switch (block.type) {
         case 'scene_heading':
-          return `<div class="scene-heading" id="${block.id}">${escapedText}</div>`;
+          return `<div class="scene-heading" id="${block.id}">${content}</div>`;
         case 'action':
-          return `<div class="action" id="${block.id}">${escapedText || '&nbsp;'}</div>`;
+          return `<div class="action" id="${block.id}">${content || '&nbsp;'}</div>`;
         case 'character':
-          return `<div class="character" id="${block.id}">${escapedText}</div>`;
+          return `<div class="character" id="${block.id}">${content}</div>`;
         case 'parenthetical':
-          return `<div class="parenthetical" id="${block.id}">${escapedText}</div>`;
+          return `<div class="parenthetical" id="${block.id}">${content}</div>`;
         case 'dialogue':
-          return `<div class="dialogue" id="${block.id}">${escapedText}</div>`;
+          return `<div class="dialogue" id="${block.id}">${content}</div>`;
         case 'transition':
-          return `<div class="transition" id="${block.id}">${escapedText}</div>`;
+          return `<div class="transition" id="${block.id}">${content}</div>`;
         case 'shot':
-          return `<div class="shot" id="${block.id}">${escapedText}</div>`;
+          return `<div class="shot" id="${block.id}">${content}</div>`;
         default:
-          return `<div class="action" id="${block.id}">${escapedText}</div>`;
+          return `<div class="action" id="${block.id}">${content}</div>`;
       }
     })
     .join('\n');
@@ -321,6 +363,12 @@ export function generateScreenplayHtml(
       font-weight: bold;
       page-break-after: avoid;
       break-after: avoid;
+    }
+
+    .character-highlight {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      display: inline;
     }
   </style>
 </head>

@@ -383,7 +383,7 @@ export class DatabaseManager {
 
     const drafts: ScriptDraft[] = draftRows.map((d) => ({
       id: d.id,
-      name: d.name,
+      name: d.name === 'Main Draft' && d.is_main ? 'Master Draft' : d.name,
       isMain: Boolean(d.is_main),
       sourceDraftId: d.source_draft_id || undefined,
       createdAt: d.created_at,

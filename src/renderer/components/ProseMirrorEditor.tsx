@@ -7,6 +7,8 @@ import React, { useEffect, useRef, useState, useCallback, useImperativeHandle } 
 import { EditorState, Transaction, Selection, Plugin, PluginKey } from 'prosemirror-state';
 import { EditorView, Decoration, DecorationSet } from 'prosemirror-view';
 import { history } from 'prosemirror-history';
+import { toggleMark } from 'prosemirror-commands';
+import { Mark } from 'prosemirror-model';
 
 import { screenplaySchema } from '../../core/editor/schema';
 import { createScreenplayKeymap } from '../../core/editor/keymap';
@@ -79,6 +81,13 @@ export interface ProseMirrorEditorHandle {
   findPrev: () => void;
   clearSearch: () => void;
   setBlockType: (type: ScreenplayBlockType) => void;
+  toggleFormat: (format: 'bold' | 'italic' | 'underline' | 'strikethrough') => void;
+  toggleHighlight: (color?: string) => void;
+  triggerFormatPainter: () => boolean;
+  isFormatPainterActive: () => boolean;
+  setLink: (url: string) => void;
+  setBlockAnnotation: (layer: string) => void;
+  setBlockComment: (comment: string) => void;
 }
 
 interface ProseMirrorEditorProps {
@@ -160,6 +169,12 @@ export const ProseMirrorEditor = React.forwardRef<ProseMirrorEditorHandle, Prose
     const [suggestionState, setSuggestionState] = useState<SuggestionState | null>(null);
     const suggestionStateRef = useRef<SuggestionState | null>(null);
     const [caretCoords, setCaretCoords] = useState<{ top: number; left: number } | null>(null);
+
+    // Format Painter state
+    const copiedMarksRef = useRef<readonly Mark[] | null>(null);
+    const [formatPainterActive, setFormatPainterActive] = useState<boolean>(false);
+    const formatPainterActiveRef = useRef(false);
+    formatPainterActiveRef.current = formatPainterActive;
 
     // Dismiss suggestions whenever a modal/dialog opens
     useEffect(() => {
@@ -328,6 +343,94 @@ export const ProseMirrorEditor = React.forwardRef<ProseMirrorEditorHandle, Prose
         if (!view) return;
         setScreenplayBlockType(type)(view.state, view.dispatch);
         view.focus();
+      },
+      toggleFormat: (format: 'bold' | 'italic' | 'underline' | 'strikethrough') => {
+        const view = viewRef.current;
+        if (!view) return;
+        const markType = screenplaySchema.marks[format];
+        if (markType) {
+          toggleMark(markType)(view.state, view.dispatch);
+          view.focus();
+        }
+      },
+      toggleHighlight: (color = 'rgba(234, 179, 8, 0.35)') => {
+        const view = viewRef.current;
+        if (!view) return;
+        const { state, dispatch } = view;
+        const { from, to, empty } = state.selection;
+        const markType = screenplaySchema.marks.highlight;
+        if (empty) return;
+        const hasMark = state.doc.rangeHasMark(from, to, markType);
+        if (hasMark) {
+          dispatch(state.tr.removeMark(from, to, markType));
+        } else {
+          dispatch(state.tr.addMark(from, to, markType.create({ color })));
+        }
+        view.focus();
+      },
+      triggerFormatPainter: () => {
+        const view = viewRef.current;
+        if (!view) return false;
+        if (formatPainterActiveRef.current) {
+          copiedMarksRef.current = null;
+          setFormatPainterActive(false);
+          return false;
+        }
+        const { state } = view;
+        const { from, empty, $from } = state.selection;
+        const marks = state.storedMarks || (!empty ? state.doc.resolve(from).marks() : $from.marks());
+        copiedMarksRef.current = marks || [];
+        setFormatPainterActive(true);
+        return true;
+      },
+      isFormatPainterActive: () => formatPainterActiveRef.current,
+      setLink: (url: string) => {
+        const view = viewRef.current;
+        if (!view) return;
+        const { state, dispatch } = view;
+        const { from, to, empty } = state.selection;
+        const markType = screenplaySchema.marks.link;
+        if (empty) return;
+        if (!url) {
+          dispatch(state.tr.removeMark(from, to, markType));
+        } else {
+          dispatch(state.tr.addMark(from, to, markType.create({ href: url })));
+        }
+        view.focus();
+      },
+      setBlockAnnotation: (layer: string) => {
+        const view = viewRef.current;
+        if (!view) return;
+        const { state, dispatch } = view;
+        const { $from } = state.selection;
+        if ($from.depth >= 1) {
+          const blockPos = $from.before(1);
+          const node = state.doc.nodeAt(blockPos);
+          if (node && node.type === screenplaySchema.nodes.screenplay_block) {
+            const tr = state.tr.setNodeMarkup(blockPos, undefined, {
+              ...node.attrs,
+              annotation: layer,
+            });
+            dispatch(tr);
+          }
+        }
+      },
+      setBlockComment: (comment: string) => {
+        const view = viewRef.current;
+        if (!view) return;
+        const { state, dispatch } = view;
+        const { $from } = state.selection;
+        if ($from.depth >= 1) {
+          const blockPos = $from.before(1);
+          const node = state.doc.nodeAt(blockPos);
+          if (node && node.type === screenplaySchema.nodes.screenplay_block) {
+            const tr = state.tr.setNodeMarkup(blockPos, undefined, {
+              ...node.attrs,
+              comment,
+            });
+            dispatch(tr);
+          }
+        }
       },
     }));
 
@@ -523,7 +626,41 @@ export const ProseMirrorEditor = React.forwardRef<ProseMirrorEditorHandle, Prose
               id: currentBlockNode.attrs.id,
               type: currentBlockNode.attrs.type as ScreenplayBlockType,
               text: currentBlockNode.textContent,
+              annotationLayer: currentBlockNode.attrs.annotation || undefined,
+              comment: currentBlockNode.attrs.comment || undefined,
             });
+          }
+
+          // Format painter application on target selection
+          if (
+            formatPainterActiveRef.current &&
+            copiedMarksRef.current &&
+            tr.selectionSet &&
+            !newState.selection.empty
+          ) {
+            const marksToApply = copiedMarksRef.current;
+            copiedMarksRef.current = null;
+            setFormatPainterActive(false);
+            setTimeout(() => {
+              if (viewRef.current) {
+                const { from, to } = viewRef.current.state.selection;
+                let painterTr = viewRef.current.state.tr;
+                [
+                  screenplaySchema.marks.bold,
+                  screenplaySchema.marks.italic,
+                  screenplaySchema.marks.underline,
+                  screenplaySchema.marks.strikethrough,
+                  screenplaySchema.marks.color,
+                  screenplaySchema.marks.highlight,
+                ].forEach((m) => {
+                  if (m) painterTr = painterTr.removeMark(from, to, m);
+                });
+                marksToApply.forEach((m) => {
+                  painterTr = painterTr.addMark(from, to, m);
+                });
+                viewRef.current.dispatch(painterTr);
+              }
+            }, 0);
           }
 
           // Screenplay element autocomplete (suppressed while transliterating or when modal is open)
