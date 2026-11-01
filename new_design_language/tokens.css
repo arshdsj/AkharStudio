@@ -1,0 +1,138 @@
+/* ==========================================================================
+   DESIGN TOKENS — single source of truth
+   Three layers (same structure Adobe Spectrum uses):
+     1. Primitives  (raw values, never used in components directly)
+     2. Semantic    (named by purpose — components use ONLY these)
+     3. Dimensions  (sizes, spacing, radii, type, motion)
+   To retheme or add a light mode, only layer 2 changes.
+   ========================================================================== */
+
+:root {
+  /* ---------- 1. PRIMITIVES ------------------------------------------- */
+  --gray-50:  #161616;
+  --gray-75:  #1a1a1a;
+  --gray-100: #1e1e1e;
+  --gray-200: #232323;
+  --gray-300: #2d2d2d;
+  --gray-400: #363636;
+  --gray-500: #3e3e3e;
+  --gray-600: #4a4a4a;
+  --gray-700: #767676;
+  --gray-800: #a1a1a1;
+  --gray-900: #ececec;
+  --gray-1000:#ffffff;
+
+  --blue-500: #2b5bc4;
+  --blue-600: #336adb;
+  --blue-650: #3b73e6;
+  --blue-800: #6e9bff;
+
+  --red-600:  #d9473f;
+  --red-800:  #ff7a70;
+  --green-800:#5fcf8a;
+
+  /* ---------- 2. SEMANTIC --------------------------------------------- */
+  /* Surfaces — hierarchy is expressed by lightness, NOT by borders. */
+  --surface-canvas:   var(--gray-50);   /* page/editor "desk" behind the script */
+  --surface-sunken:   var(--gray-75);   /* inset tracks (segmented, search) */
+  --surface-chrome:   var(--gray-100);  /* top bar, tab strip, status bar */
+  --surface-panel:    var(--gray-200);  /* side panels */
+  --surface-control:  var(--gray-300);  /* inputs, secondary buttons */
+  --surface-hover:    var(--gray-400);
+  --surface-pressed:  var(--gray-500);
+  --surface-overlay:  #2a2a2a;          /* dialogs, menus, popovers */
+  --surface-scrim:    rgba(0, 0, 0, .55);
+  --surface-selected: rgba(110, 155, 255, .16);  /* selected row / tab tint */
+  --surface-thumb:    var(--gray-500);  /* active segment */
+
+  /* Text */
+  --text-primary:   var(--gray-900);
+  --text-secondary: var(--gray-800);
+  --text-disabled:  var(--gray-700);   /* disabled + placeholder ONLY (3.4:1) */
+  --text-accent:    var(--blue-800);
+  --text-on-accent: var(--gray-1000);
+  --text-danger:    var(--red-800);
+
+  /* Accent (one hue, used sparingly: primary action, focus, active tab) */
+  --accent-fill:         var(--blue-600);
+  --accent-fill-hover:   var(--blue-650);
+  --accent-fill-pressed: var(--blue-500);
+
+  /* Lines — the ONLY three legitimate uses of a 1px line */
+  --line-separator: rgba(255, 255, 255, .08);  /* between regions / header underline */
+  --line-edge:      rgba(255, 255, 255, .06);  /* top edge on floating surfaces */
+  --focus-ring:     var(--blue-800);           /* 2px, keyboard focus only */
+
+  /* Elevation (floating things only) */
+  --shadow-overlay: 0 0 0 1px rgba(0,0,0,.5), 0 8px 24px rgba(0,0,0,.45), 0 24px 56px rgba(0,0,0,.35);
+  --shadow-thumb:   0 1px 2px rgba(0,0,0,.4);
+
+  /* ---------- 3. DIMENSIONS ------------------------------------------- */
+  /* Spacing — 4px grid. Nothing else is allowed. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* Control heights — every interactive control is one of these */
+  --h-sm: 24px;   /* dense toolbars, icon buttons */
+  --h-md: 28px;   /* DEFAULT: inputs, buttons, segmented, select */
+  --h-lg: 32px;   /* list rows, dialog footer buttons */
+
+  /* Radii — three, no exceptions */
+  --radius-sm: 4px;   /* controls */
+  --radius-md: 6px;   /* menus, popovers */
+  --radius-lg: 8px;   /* dialogs */
+  --radius-pill: 999px; /* switch track and thumb ONLY */
+
+  /* Switch: track 28x16, thumb 12, 2px inset, 12px travel */
+  --switch-w: 28px;
+  --switch-h: 16px;
+  --switch-thumb: 12px;
+  --switch-inset: 2px;
+  --switch-travel: calc(var(--switch-w) - var(--switch-thumb) - 2 * var(--switch-inset));
+  --switch-track-off:   var(--gray-500);
+  --switch-track-off-hover: var(--gray-600);
+  --switch-thumb-off:   var(--gray-800);
+  --switch-thumb-on:    var(--gray-1000);
+  --switch-press-stretch: 3px;
+
+  /* Layout */
+  --panel-width: 320px;          /* fixed; user-resizable range 280–420 */
+  --panel-header-h: 40px;
+  --tabs-h: 36px;
+  --panel-pad: var(--space-4);   /* 16px — every panel, every tab */
+  --section-gap: var(--space-6); /* 24px between sections */
+  --dialog-width: 480px;
+  --dialog-header-h: 48px;
+
+  /* Type — system UI stack (San Francisco / Segoe UI), Gurmukhi falls back to Noto */
+  --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text",
+             "Segoe UI", "Noto Sans Gurmukhi", system-ui, sans-serif;
+  --font-script: "Courier Prime", "Courier New", "Noto Sans Gurmukhi", monospace;
+
+  --text-xs: 11px;   /* meta, counts */
+  --text-sm: 12px;   /* DEFAULT body, controls, labels */
+  --text-md: 13px;   /* emphasised rows, dialog body */
+  --text-lg: 15px;   /* dialog + panel titles */
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --leading-tight: 1.3;
+  --leading-body: 1.5;
+
+  /* Motion */
+  --ease: cubic-bezier(.2, 0, 0, 1);
+  --dur-fast: 100ms;   /* hover, press */
+  --dur-base: 160ms;   /* tabs, segmented thumb */
+  --dur-slow: 220ms;   /* dialog, panel collapse */
+}
+
+/* Gurmukhi glyphs are visually smaller than Latin at equal size. */
+:lang(pa), .gurmukhi { font-size: 1.08em; line-height: 1.6; }
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --dur-fast: 0ms; --dur-base: 0ms; --dur-slow: 0ms; }
+}

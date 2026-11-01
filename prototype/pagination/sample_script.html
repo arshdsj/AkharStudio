@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="pa">
+<head>
+  <meta charset="UTF-8">
+  <title>Punjabi Screenplay Pagination & Shaping Prototype</title>
+  <style>
+    @font-face {
+      font-family: "Noto Sans Gurmukhi";
+      src: url("file:///Users/arshdsj/Library/Fonts/NotoSansGurmukhi-VariableFont_wdth,wght.ttf") format("truetype");
+      font-weight: 100 900;
+    }
+
+    @page letter {
+      size: 8.5in 11in;
+      margin: 1.0in 1.0in 1.0in 1.5in;
+    }
+    @page a4 {
+      size: 210mm 297mm;
+      margin: 25.4mm 25.4mm 25.4mm 38.1mm;
+    }
+
+    body {
+      margin: 0;
+      padding: 20px;
+      background: #1a1a1a;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 30px;
+      font-family: "Noto Sans Gurmukhi", "Courier", monospace;
+      color: #000;
+    }
+
+    .page {
+      background: #fff;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+      box-sizing: border-box;
+      position: relative;
+    }
+
+    .page.us-letter {
+      width: 8.5in;
+      height: 11in;
+      padding: 1.0in 1.0in 1.0in 1.5in;
+    }
+
+    .page.a4 {
+      width: 210mm;
+      height: 297mm;
+      padding: 25.4mm 25.4mm 25.4mm 38.1mm;
+    }
+
+    .page-number {
+      position: absolute;
+      top: 0.5in;
+      right: 1.0in;
+      font-size: 12pt;
+    }
+
+    .script-content {
+      font-size: 12pt;
+      line-height: 14pt;
+    }
+
+    .scene-heading {
+      text-transform: uppercase;
+      font-weight: bold;
+      margin-top: 24pt;
+      margin-bottom: 12pt;
+    }
+
+    .action {
+      margin-bottom: 12pt;
+      max-width: 6.0in;
+    }
+
+    .character {
+      text-transform: uppercase;
+      margin-top: 12pt;
+      margin-bottom: 0;
+      margin-left: 2.2in;
+    }
+
+    .parenthetical {
+      margin-top: 0;
+      margin-bottom: 0;
+      margin-left: 1.6in;
+      max-width: 2.0in;
+    }
+
+    .dialogue {
+      margin-top: 0;
+      margin-bottom: 12pt;
+      margin-left: 1.0in;
+      max-width: 3.5in;
+    }
+
+    .transition {
+      text-transform: uppercase;
+      margin-top: 12pt;
+      margin-bottom: 12pt;
+      text-align: right;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- US LETTER PAGE -->
+  <div class="page us-letter">
+    <div class="page-number">1.</div>
+    <div class="script-content">
+      <div class="scene-heading">EXT. VILLAGE COURTYARD - DAY</div>
+      <div class="action">
+        ਸੂਰਜ ਸਿਰ 'ਤੇ ਚੜ੍ਹਿਆ ਹੋਇਆ ਹੈ। ਪਿੰਡ ਦੇ ਪਿੱਪਲ ਹੇਠ ਬਜ਼ੁਰਗ ਚੌਪਾਲ ਲਾਈ ਬੈਠੇ ਹਨ।
+        The dusty road shimmers under the blazing Punjab afternoon sun.
+      </div>
+
+      <div class="character">ਗੁਰਦਿਆਲ ਸਿੰਘ</div>
+      <div class="parenthetical">(ਚਿੰਤਾ ਵਿੱਚ, ਹੌਲੀ ਜਿਹੀ)</div>
+      <div class="dialogue">
+        ਕਿੱਥੇ ਰਹਿ ਗਿਆ ਮੁੰਡਾ? ਮੈਂ ਉਹਨੂੰ ਦਸ ਵਾਰ ਕਿਹਾ ਸੀ ਕਿ ਅੰਮ੍ਰਿਤਸਰ ਵਾਲੀ ਬੱਸ ਵੇਲੇ ਸਿਰ ਫੜਨੀ ਆਂ।
+      </div>
+
+      <div class="character">ਸਿਮਰਨ</div>
+      <div class="dialogue">
+        ਚਾਚਾ ਜੀ, ਫ਼ਿਕਰ ਨਾ ਕਰੋ। ਉਹ ਆਪਣੀ ਪੁਰਾਣੀ ਜੀਪ ਚ ਗਿਆ ਏ। ਕਹਿੰਦਾ ਸੀ ਕਿ ਪ੍ਰਿੰਸੀਪਲ ਸਾਹਿਬ ਨਾਲ ਗੱਲ ਕਰਕੇ ਸਿੱਧਾ ਘਰ ਆਵੇਗਾ।
+      </div>
+
+      <div class="character">ਗੁਰਦਿਆਲ ਸਿੰਘ</div>
+      <div class="dialogue">
+        ਉਨ੍ਹਾਂ ਦਾ ਕੋਈ ਭਰੋਸਾ ਨਹੀਂ। ਜ਼ਿੰਦਗੀ ਚ ਕਦੇ ਕੋਈ ਕੰਮ ਵੇਲੇ ਸਿਰ ਕੀਤਾ ਏ ਉਹਨੇ?
+      </div>
+
+      <div class="transition">FADE OUT.</div>
+    </div>
+  </div>
+
+</body>
+</html>

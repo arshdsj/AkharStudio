@@ -1,0 +1,177 @@
+@import 'prosemirror-view/style/prosemirror.css';
+@import './styles/tokens.css';
+@import './styles/components.css';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  /* Quiet, modern scrollbars using design system tokens */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--surface-control) transparent;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--surface-control);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--surface-hover);
+  }
+}
+
+/* Screenplay Paper & ProseMirror User Select & Dimensions */
+.screenplay-paper,
+.script-content,
+.prosemirror-container,
+.ProseMirror {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+}
+
+.prosemirror-container {
+  width: 100%;
+  min-height: 8in;
+  cursor: text;
+}
+
+.ProseMirror {
+  min-height: 8in;
+  cursor: text;
+  outline: none !important;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+/* Window Dragging for macOS Custom Titlebar */
+.app-drag {
+  -webkit-app-region: drag;
+}
+
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
+/* Screenplay Block Base Styling */
+.screenplay-block {
+  min-height: 1.5em;
+  position: relative;
+}
+
+/* Ensure empty blocks retain line height and caret visibility */
+.screenplay-block:empty::before {
+  content: '';
+  display: inline-block;
+}
+
+/* Transliteration uncommitted inline composition buffer */
+.transliteration-inline-buffer {
+  text-decoration: underline dashed var(--accent-text);
+  color: var(--text-primary);
+  background-color: rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-sm);
+  padding: 0 3px;
+  font-weight: var(--weight-medium);
+}
+
+/* Screenplay Paper Dimensions - Pro Studio Dark Sheet */
+.screenplay-paper {
+  background-color: #1e1e22;
+  color: #f2f2f4;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45), 0 20px 56px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  border-radius: var(--radius-sm);
+  font-family: 'Courier Prime', 'Noto Sans Gurmukhi', monospace;
+  position: relative;
+  transition: width 0.2s ease, height 0.2s ease;
+  caret-color: var(--accent-text);
+}
+
+.screenplay-paper ::selection {
+  background-color: var(--accent-fill);
+  color: var(--text-on-accent);
+}
+
+.screenplay-paper.paper-letter {
+  width: 8.5in;
+  min-height: 11in;
+  padding: 1.0in 1.0in 1.0in 1.5in; /* Standard screenplay margins */
+}
+
+.screenplay-paper.paper-a4 {
+  width: 210mm;
+  min-height: 297mm;
+  padding: 25.4mm 25.4mm 25.4mm 38.1mm;
+}
+
+/* Screenplay Element Indentations */
+.block-scene-heading {
+  font-weight: bold;
+  text-transform: uppercase;
+  margin-top: 24pt;
+  margin-bottom: 12pt;
+  letter-spacing: 0.5px;
+}
+
+.block-action {
+  margin-top: 0;
+  margin-bottom: 12pt;
+  max-width: 6.0in;
+  line-height: 1.4;
+}
+
+.block-character {
+  font-weight: bold;
+  text-transform: uppercase;
+  margin-top: 14pt;
+  margin-bottom: 0;
+  margin-left: 2.2in;
+  letter-spacing: 0.5px;
+}
+
+.block-parenthetical {
+  margin-top: 0;
+  margin-bottom: 0;
+  margin-left: 1.6in;
+  max-width: 2.2in;
+}
+
+.block-dialogue {
+  margin-top: 0;
+  margin-bottom: 12pt;
+  margin-left: 1.0in;
+  max-width: 3.5in;
+  line-height: 1.4;
+}
+
+.block-transition {
+  font-weight: bold;
+  text-transform: uppercase;
+  margin-top: 14pt;
+  margin-bottom: 12pt;
+  margin-left: 4.0in;
+}
+
+.block-shot {
+  font-weight: bold;
+  text-transform: uppercase;
+  margin-top: 14pt;
+  margin-bottom: 12pt;
+  letter-spacing: 0.5px;
+}
+
+/* Disable selection outline for authentic document look */
+[contenteditable]:focus {
+  outline: none;
+}
