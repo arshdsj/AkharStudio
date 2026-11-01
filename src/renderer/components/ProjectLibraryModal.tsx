@@ -70,6 +70,7 @@ export const ProjectLibraryModal: React.FC<ProjectLibraryModalProps> = ({
         ref={modalRef}
         className="ds-dialog max-h-[85vh] flex flex-col"
         role="dialog"
+        aria-modal="true"
         aria-labelledby="library-title"
       >
         {/* Header */}

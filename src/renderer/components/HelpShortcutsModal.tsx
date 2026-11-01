@@ -39,6 +39,7 @@ export const HelpShortcutsModal: React.FC<HelpShortcutsModalProps> = ({ isOpen, 
         className="ds-dialog max-h-[85vh] flex flex-col"
         style={{ width: '640px', maxWidth: 'calc(100vw - 32px)' }}
         role="dialog"
+        aria-modal="true"
         aria-labelledby="help-title"
       >
         {/* Header */}
@@ -67,7 +68,8 @@ export const HelpShortcutsModal: React.FC<HelpShortcutsModalProps> = ({ isOpen, 
                 { label: 'Character', shortcut: `${mod}3` },
                 { label: 'Parenthetical', shortcut: `${mod}4` },
                 { label: 'Dialogue', shortcut: `${mod}5` },
-                { label: 'Transition', shortcut: `${mod}6` },
+                { label: 'Shot', shortcut: `${mod}6` },
+                { label: 'Transition', shortcut: `${mod}7` },
               ].map((item) => (
                 <div
                   key={item.label}

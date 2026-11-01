@@ -3,7 +3,7 @@
  * Adheres strictly to the Script Editor Design System (tokens.css, components.css, reference.html)
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Undo2,
   Redo2,
@@ -27,6 +27,7 @@ import {
   Keyboard,
 } from 'lucide-react';
 import { ScreenplayBlock, ScreenplayBlockType } from '../../types/screenplay';
+import { ScreenplayElementMenu } from './ScreenplayElementMenu';
 
 interface FloatingToolbarProps {
   activeBlock: ScreenplayBlock | null;
@@ -54,10 +55,13 @@ export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
   onApplyFormat,
   onToggleCase,
   onCopy,
+  onSelectBlockType,
   isKeyboardOpen = false,
   onToggleKeyboard,
   onKeepFocus,
 }) => {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
   const preventFocusLoss = (e: React.SyntheticEvent) => {
     e.preventDefault();
   };
@@ -152,24 +156,55 @@ export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
       {/* Divider */}
       <div style={{ width: '1px', height: '14px', background: 'var(--line-separator)', margin: '0 2px' }} />
 
-      {/* 3. Current Element Icon (Disabled during title editing per TITLE-02) */}
-      <div
-        className={`flex items-center gap-1.5 px-2 rounded ${isTitleEditing ? 'opacity-30 cursor-not-allowed' : ''}`}
-        style={{
-          height: 'var(--h-sm)',
-          background: isTitleEditing ? 'transparent' : 'var(--surface-control)',
-          color: isTitleEditing ? 'var(--text-disabled)' : 'var(--text-accent)',
-        }}
-        title={
-          isTitleEditing
-            ? 'Element selector disabled in Title Card (TITLE-02)'
-            : `Current Screenplay Element: ${getElementLabel(currentType)}`
-        }
-      >
-        {getElementIcon(currentType)}
-        <span className="font-semibold text-[11px] uppercase tracking-wider">
-          {isTitleEditing ? 'Title' : getElementLabel(currentType)}
-        </span>
+      {/* 3. Current Element Button & Contextual Popover (Disabled during title editing per TITLE-02) */}
+      <div className="relative">
+        <button
+          type="button"
+          onMouseDown={preventFocusLoss}
+          onPointerDown={preventFocusLoss}
+          onClick={() => {
+            if (!isTitleEditing) {
+              setIsMenuOpen((prev) => !prev);
+            }
+          }}
+          disabled={isTitleEditing}
+          aria-haspopup="menu"
+          aria-expanded={isMenuOpen}
+          className={`flex items-center gap-1.5 px-2 rounded transition-colors ${
+            isTitleEditing ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer'
+          }`}
+          style={{
+            height: 'var(--h-sm)',
+            background: isTitleEditing
+              ? 'transparent'
+              : isMenuOpen
+              ? 'var(--surface-selected)'
+              : 'var(--surface-control)',
+            color: isTitleEditing ? 'var(--text-disabled)' : 'var(--text-accent)',
+            border: 0,
+          }}
+          title={
+            isTitleEditing
+              ? 'Element selector disabled in Title Card (TITLE-02)'
+              : `Current Screenplay Element: ${getElementLabel(currentType)}`
+          }
+        >
+          {getElementIcon(currentType)}
+          <span className="font-semibold text-[11px] uppercase tracking-wider">
+            {isTitleEditing ? 'Title' : getElementLabel(currentType)}
+          </span>
+        </button>
+
+        <ScreenplayElementMenu
+          isOpen={isMenuOpen && !isTitleEditing}
+          activeType={currentType}
+          onSelectType={(newType) => {
+            onSelectBlockType(newType);
+            setIsMenuOpen(false);
+          }}
+          onClose={() => setIsMenuOpen(false)}
+          onKeepFocus={onKeepFocus}
+        />
       </div>
 
       {/* 4. Alignment / Indentation */}

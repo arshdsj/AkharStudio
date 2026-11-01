@@ -10,7 +10,7 @@ import { history } from 'prosemirror-history';
 
 import { screenplaySchema } from '../../core/editor/schema';
 import { createScreenplayKeymap } from '../../core/editor/keymap';
-import { handleScreenplayBackspace } from '../../core/editor/commands';
+import { handleScreenplayBackspace, setBlockType as setScreenplayBlockType } from '../../core/editor/commands';
 import { draftToProseMirrorDoc, proseMirrorDocToDraft } from '../../core/editor/documentAdapter';
 import { generateId } from '../../core/model/ProjectModel';
 import {
@@ -29,6 +29,14 @@ import {
   createVirtualKeyboardPlugin,
   insertVirtualKeyOutput,
 } from '../../core/editor/virtualKeyboardPlugin';
+import {
+  createSearchPlugin,
+  setSearchQuery,
+  findNextMatch,
+  findPrevMatch,
+  clearSearch,
+  SearchState,
+} from '../../core/editor/searchPlugin';
 import { KeyOutput } from '../../core/editor/gurmukhiKeyboardMappings';
 import { SuggestionPopup } from './SuggestionPopup';
 import { TransliterationPopup } from './TransliterationPopup';
@@ -66,6 +74,11 @@ export interface ProseMirrorEditorHandle {
   insertKeyOutput: (output: KeyOutput) => void;
   backspace: () => void;
   getSelectedBlocks: () => ScreenplayBlock[] | null;
+  setSearch: (query: string, caseSensitive?: boolean, wholeWord?: boolean) => void;
+  findNext: () => void;
+  findPrev: () => void;
+  clearSearch: () => void;
+  setBlockType: (type: ScreenplayBlockType) => void;
 }
 
 interface ProseMirrorEditorProps {
@@ -81,6 +94,7 @@ interface ProseMirrorEditorProps {
   onActiveBlockChange: (block: ScreenplayBlock | null) => void;
   highlightCharacters?: HighlightCharactersSetting;
   isModalOpen?: boolean;
+  onSearchStateChange?: (state: SearchState) => void;
 }
 
 export const ProseMirrorEditor = React.forwardRef<ProseMirrorEditorHandle, ProseMirrorEditorProps>(
@@ -98,6 +112,7 @@ export const ProseMirrorEditor = React.forwardRef<ProseMirrorEditorHandle, Prose
       onActiveBlockChange,
       highlightCharacters,
       isModalOpen = false,
+      onSearchStateChange,
     },
     ref
   ) => {
@@ -137,6 +152,9 @@ export const ProseMirrorEditor = React.forwardRef<ProseMirrorEditorHandle, Prose
 
     const isModalOpenRef = useRef(isModalOpen);
     isModalOpenRef.current = isModalOpen;
+
+    const onSearchStateChangeRef = useRef(onSearchStateChange);
+    onSearchStateChangeRef.current = onSearchStateChange;
 
     // Screenplay Autocomplete state (Character, Scene, Transition)
     const [suggestionState, setSuggestionState] = useState<SuggestionState | null>(null);
@@ -284,6 +302,32 @@ export const ProseMirrorEditor = React.forwardRef<ProseMirrorEditorHandle, Prose
         });
 
         return blocks.length > 0 ? blocks : null;
+      },
+      setSearch: (query: string, caseSensitive?: boolean, wholeWord?: boolean) => {
+        const view = viewRef.current;
+        if (!view) return;
+        setSearchQuery(view, query, caseSensitive, wholeWord);
+      },
+      findNext: () => {
+        const view = viewRef.current;
+        if (!view) return;
+        findNextMatch(view);
+      },
+      findPrev: () => {
+        const view = viewRef.current;
+        if (!view) return;
+        findPrevMatch(view);
+      },
+      clearSearch: () => {
+        const view = viewRef.current;
+        if (!view) return;
+        clearSearch(view);
+      },
+      setBlockType: (type: ScreenplayBlockType) => {
+        const view = viewRef.current;
+        if (!view) return;
+        setScreenplayBlockType(type)(view.state, view.dispatch);
+        view.focus();
       },
     }));
 
@@ -436,10 +480,21 @@ export const ProseMirrorEditor = React.forwardRef<ProseMirrorEditorHandle, Prose
         },
       });
 
+      const searchPlugin = createSearchPlugin((s) => {
+        onSearchStateChangeRef.current?.(s);
+      });
+
       const state = EditorState.create({
         doc: initialDoc,
         schema: screenplaySchema,
-        plugins: [history(), translitPlugin, vkPlugin, characterHighlightPlugin, createScreenplayKeymap()],
+        plugins: [
+          history(),
+          translitPlugin,
+          vkPlugin,
+          characterHighlightPlugin,
+          searchPlugin,
+          createScreenplayKeymap(),
+        ],
       });
 
       const view = new EditorView(editorMountRef.current, {

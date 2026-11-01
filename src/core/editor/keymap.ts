@@ -27,8 +27,8 @@ export function createScreenplayKeymap() {
     'Mod-3': setBlockType('character'),
     'Mod-4': setBlockType('parenthetical'),
     'Mod-5': setBlockType('dialogue'),
-    'Mod-6': setBlockType('transition'),
-    'Mod-7': setBlockType('shot'),
+    'Mod-6': setBlockType('shot'),
+    'Mod-7': setBlockType('transition'),
     // Mod+8 is reserved and inert per EDIT-05, T-02
     'Mod-8': () => true,
 

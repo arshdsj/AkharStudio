@@ -185,26 +185,26 @@ describe('AkharStudio Enhancements Test Suite', () => {
   // 2. ABOUT SECTION AND VERSION NUMBERING
   // =========================================================================
   describe('2. About Section & Version Numbering', () => {
-    it('centralizes version as 1.0 and author as Arsh DSJ', () => {
-      expect(APP_VERSION).toBe('1.0');
+    it('centralizes version as 1.1 and author as Arsh DSJ', () => {
+      expect(APP_VERSION).toBe('1.1');
       expect(APP_AUTHOR).toBe('Arsh DSJ');
     });
 
-    it('renders About modal displaying Version 1.0 and Created By Arsh DSJ', () => {
+    it('renders About modal displaying Version 1.1 and Created By Arsh DSJ', () => {
       const onClose = vi.fn();
       render(<AboutModal isOpen={true} onClose={onClose} />);
 
       expect(screen.getByText(/About/i)).toBeInTheDocument();
-      expect(screen.getByText(/Version 1\.0/i)).toBeInTheDocument();
+      expect(screen.getByText(/Version 1\.1/i)).toBeInTheDocument();
       expect(screen.getByText(/Created By/i)).toBeInTheDocument();
       expect(screen.getByText('Arsh DSJ')).toBeInTheDocument();
     });
 
-    it('renders About section in Help & Shortcuts modal displaying Version 1.0 and Created By Arsh DSJ', () => {
+    it('renders About section in Help & Shortcuts modal displaying Version 1.1 and Created By Arsh DSJ', () => {
       const onClose = vi.fn();
       render(<HelpShortcutsModal isOpen={true} onClose={onClose} />);
 
-      expect(screen.getByText('1.0')).toBeInTheDocument();
+      expect(screen.getByText('1.1')).toBeInTheDocument();
       expect(screen.getByText('Arsh DSJ')).toBeInTheDocument();
     });
   });

@@ -51,6 +51,8 @@ import { exportProjectBundle, importProjectBundle } from '../core/storage/projec
 import { AboutModal } from './components/AboutModal';
 import { HighlightCharactersModal } from './components/HighlightCharactersModal';
 import { ExportPdfOptions } from './components/ExportModal';
+import { FindBar } from './components/FindBar';
+import { SearchState } from '../core/editor/searchPlugin';
 import { normalizeCharacterName } from '../core/editor/contd';
 import { HighlightCharactersSetting } from '../types/screenplay';
 
@@ -92,6 +94,19 @@ export const App: React.FC = () => {
   const [contdPrompt, setContdPrompt] = useState<{ isOpen: boolean; characterName: string }>({
     isOpen: false,
     characterName: '',
+  });
+
+  // In-Draft Search state (ORG-04 P0)
+  const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [searchCaseSensitive, setSearchCaseSensitive] = useState<boolean>(false);
+  const [searchWholeWord, setSearchWholeWord] = useState<boolean>(false);
+  const [searchState, setSearchState] = useState<SearchState>({
+    query: '',
+    caseSensitive: false,
+    wholeWord: false,
+    matches: [],
+    activeIndex: -1,
   });
 
   // Diagnostic recording state & toast notifications
@@ -511,7 +526,50 @@ export const App: React.FC = () => {
     handleRestoreDatabaseBackup,
   ]);
 
-  // Global Keyboard shortcuts (Mod+S, Mod+O, Mod+N)
+  // In-Draft Search handlers (ORG-04 P0)
+  const handleOpenSearch = useCallback(() => {
+    setIsSearchOpen(true);
+  }, []);
+
+  const handleCloseSearch = useCallback(() => {
+    setIsSearchOpen(false);
+    editorRef.current?.clearSearch();
+    editorRef.current?.focus();
+  }, []);
+
+  const handleSearchQueryChange = useCallback(
+    (query: string) => {
+      setSearchQuery(query);
+      editorRef.current?.setSearch(query, searchCaseSensitive, searchWholeWord);
+    },
+    [searchCaseSensitive, searchWholeWord]
+  );
+
+  const handleToggleCaseSensitive = useCallback(() => {
+    setSearchCaseSensitive((prev) => {
+      const next = !prev;
+      editorRef.current?.setSearch(searchQuery, next, searchWholeWord);
+      return next;
+    });
+  }, [searchQuery, searchWholeWord]);
+
+  const handleToggleWholeWord = useCallback(() => {
+    setSearchWholeWord((prev) => {
+      const next = !prev;
+      editorRef.current?.setSearch(searchQuery, searchCaseSensitive, next);
+      return next;
+    });
+  }, [searchQuery, searchCaseSensitive]);
+
+  const handleFindNext = useCallback(() => {
+    editorRef.current?.findNext();
+  }, []);
+
+  const handleFindPrev = useCallback(() => {
+    editorRef.current?.findPrev();
+  }, []);
+
+  // Global Keyboard shortcuts (Mod+S, Mod+O, Mod+N, Mod+F)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.defaultPrevented) return;
@@ -530,12 +588,12 @@ export const App: React.FC = () => {
         handleNewProject();
       } else if (mod && e.key === 'f') {
         e.preventDefault();
-        // find dialog trigger
+        handleOpenSearch();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleSave, handleSaveAs, handleOpenFile, handleNewProject]);
+  }, [handleSave, handleSaveAs, handleOpenFile, handleNewProject, handleOpenSearch]);
 
   // Undo / Redo
   const handleUndo = () => {
@@ -830,7 +888,7 @@ export const App: React.FC = () => {
         currentFilePath={currentFilePath}
         projectSource={projectSource}
         onOpenLibrary={() => setIsWelcomeOpen(true)}
-        onOpenSearch={() => {}}
+        onOpenSearch={handleOpenSearch}
         onRetrySave={handleSave}
         onExpandTitlePage={() => setIsTitlePageExpanded((prev) => !prev)}
         onOpenCustomDictionary={() => setCustomDictionaryOpen(true)}
@@ -919,6 +977,23 @@ export const App: React.FC = () => {
             recoverySnapshot !== null ||
             contdPrompt.isOpen
           }
+          onSearchStateChange={setSearchState}
+        />
+
+        {/* In-Draft Search Bar (ORG-04 P0, A11Y-01) */}
+        <FindBar
+          isOpen={isSearchOpen}
+          onClose={handleCloseSearch}
+          query={searchQuery}
+          onQueryChange={handleSearchQueryChange}
+          matchesCount={searchState.matches.length}
+          activeIndex={searchState.activeIndex}
+          caseSensitive={searchCaseSensitive}
+          onToggleCaseSensitive={handleToggleCaseSensitive}
+          wholeWord={searchWholeWord}
+          onToggleWholeWord={handleToggleWholeWord}
+          onFindNext={handleFindNext}
+          onFindPrev={handleFindPrev}
         />
       </div>
 
@@ -949,7 +1024,11 @@ export const App: React.FC = () => {
           editorRef.current?.focus();
         }}
         onSelectBlockType={(type) => {
-          if (activeBlock) handleBlockTypeChange(activeBlock.id, type);
+          if (editorRef.current) {
+            editorRef.current.setBlockType(type);
+          } else if (activeBlock) {
+            handleBlockTypeChange(activeBlock.id, type);
+          }
           editorRef.current?.focus();
         }}
         isKeyboardOpen={virtualKeyboardOpen}

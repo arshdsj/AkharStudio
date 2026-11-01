@@ -24,7 +24,7 @@ export const RecoveryModal: React.FC<RecoveryModalProps> = ({
 
   return (
     <div className="ds-scrim">
-      <div className="ds-dialog" role="dialog" aria-labelledby="recovery-title">
+      <div className="ds-dialog" role="dialog" aria-modal="true" aria-labelledby="recovery-title">
         <div className="ds-dialog__header">
           <span id="recovery-title">Unsaved Work Detected</span>
         </div>

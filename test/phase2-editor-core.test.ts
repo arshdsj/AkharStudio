@@ -99,17 +99,17 @@ describe('Phase 2: Screenplay Block Editor Core (Package W2)', () => {
       });
       expect(state.doc.child(0).attrs.type).toBe('dialogue');
 
-      // Mod+6 -> transition
-      setBlockType('transition')(state, (tr) => {
-        state = state.apply(tr);
-      });
-      expect(state.doc.child(0).attrs.type).toBe('transition');
-
-      // Mod+7 -> shot
+      // Mod+6 -> shot
       setBlockType('shot')(state, (tr) => {
         state = state.apply(tr);
       });
       expect(state.doc.child(0).attrs.type).toBe('shot');
+
+      // Mod+7 -> transition
+      setBlockType('transition')(state, (tr) => {
+        state = state.apply(tr);
+      });
+      expect(state.doc.child(0).attrs.type).toBe('transition');
 
       // Mod+4 -> parenthetical
       setBlockType('parenthetical')(state, (tr) => {
@@ -213,10 +213,10 @@ describe('Phase 2: Screenplay Block Editor Core (Package W2)', () => {
   });
 
   describe('EDIT-03 & EDIT-04: Tab Key Element Cycling & Picker Options', () => {
-    it('verifies horizontal element picker has exactly 7 items with S, A, C, P, D, T, SH badges', () => {
+    it('verifies horizontal element picker has exactly 7 items with S, A, C, P, D, SH, T badges', () => {
       expect(ELEMENT_PICKER_OPTIONS).toHaveLength(7);
       const badges = ELEMENT_PICKER_OPTIONS.map((o) => o.badge);
-      expect(badges).toEqual(['S', 'A', 'C', 'P', 'D', 'T', 'SH']);
+      expect(badges).toEqual(['S', 'A', 'C', 'P', 'D', 'SH', 'T']);
     });
 
     it('Tab on empty Action cycles block to Character', () => {

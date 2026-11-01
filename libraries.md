@@ -119,6 +119,7 @@ Pinned, reproducible build required; any patch (ActualText) lives in a pinned fo
 | `prosemirror-commands` | 1.7.1 | MIT | Standard text & mark commands | **T** — 37 tests pass |
 | `prosemirror-transform` | 1.10.3 | MIT | Document step transformations | **T** — 37 tests pass |
 | `pdf-parse` | 2.4.5 | MIT | PDF.js-based logical Unicode text extraction in CI (`TM-06`) | **T** — 21 Phase 4 tests pass |
+| `electron-builder` | 26.18.0 | MIT | Desktop standalone packaging (`.dmg`, `.exe`) (`W7`) | **T** — Verified build configuration |
 
 ## 8. Required follow-ups
 

@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import iconPng from '../../../assets/icon.png';
 
 interface AkharStudioLogoProps {
   className?: string;
@@ -60,7 +61,7 @@ export const AkharStudioLogo: React.FC<AkharStudioLogoProps> = ({
       title={mode ? undefined : "AkharStudio (ਅੱਖਰStudio) — Click to switch logo script"}
       className={`flex items-center gap-3 select-none group ${mode ? '' : 'cursor-pointer'} transition-all duration-300 ${className}`}
     >
-      {/* Premium Logo Mark: Stylized Gurmukhi 'ਅ' + Modern Pen Nib geometry */}
+      {/* Official AkharStudio Icon Mark: Gurmukhi 'ਅ' + Film Strip + Script Red Margin */}
       <div
         className={`relative ${
           isHero
@@ -70,44 +71,13 @@ export const AkharStudioLogo: React.FC<AkharStudioLogoProps> = ({
             : isSm
             ? 'w-6 h-6 rounded-md'
             : 'w-7 h-7 rounded-lg'
-        } bg-gradient-to-br from-zinc-800 via-zinc-900 to-[#18181b] border border-white/10 shadow-md flex items-center justify-center overflow-hidden group-hover:border-rose-500/50 group-hover:shadow-[0_0_12px_rgba(244,63,94,0.3)] transition-all duration-300 shrink-0`}
+        } bg-[#141416] border border-white/10 shadow-md flex items-center justify-center overflow-hidden group-hover:border-rose-500/50 group-hover:shadow-[0_0_12px_rgba(244,63,94,0.3)] transition-all duration-300 shrink-0`}
       >
-        {/* Subtle ambient glow behind emblem */}
-        <div className="absolute inset-0 bg-gradient-to-tr from-rose-500/15 via-transparent to-amber-500/10 opacity-70 group-hover:opacity-100 transition-opacity" />
-
-        {/* Gurmukhi 'ਅ' Stylized Vector Mark */}
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          className={`${
-            isHero ? 'w-8 h-8' : isLg ? 'w-6 h-6' : isSm ? 'w-3.5 h-3.5' : 'w-4 h-4'
-          } relative z-10 text-zinc-100 group-hover:text-rose-400 transition-colors duration-300`}
-        >
-          {/* Top horizontal Gurmukhi bar */}
-          <path
-            d="M5 6H19"
-            stroke="currentColor"
-            strokeWidth={isHero ? '2.5' : '2.2'}
-            strokeLinecap="round"
-          />
-          {/* Elegant Punjabi 'ਅ' cursive curve looping into studio pen nib */}
-          <path
-            d="M8.5 6C8.5 8.2 10.2 9.8 12.5 9.8C14.8 9.8 16.5 11.2 16.5 13.5C16.5 16 14.5 18 12 18C9.8 18 8.2 16.5 8 14.5"
-            stroke="currentColor"
-            strokeWidth={isHero ? '2.3' : '2.0'}
-            strokeLinecap="round"
-          />
-          {/* Vertical stem */}
-          <path
-            d="M16 6V18"
-            stroke="currentColor"
-            strokeWidth={isHero ? '2.5' : '2.2'}
-            strokeLinecap="round"
-          />
-          {/* Core creative dot (Bindi / Essence) */}
-          <circle cx="12" cy="13.5" r={isHero ? 2.0 : isLg ? 1.5 : 1.2} fill="#f43f5e" />
-        </svg>
+        <img
+          src={iconPng}
+          alt="AkharStudio"
+          className="w-full h-full object-contain pointer-events-none select-none rounded-[inherit]"
+        />
       </div>
 
       {/* Typography: Smoothly transitions between AkharStudio and ਅੱਖਰStudio */}

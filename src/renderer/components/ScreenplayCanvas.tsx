@@ -7,6 +7,7 @@ import React, { useRef, useImperativeHandle } from 'react';
 import { TitleCard } from './TitleCard';
 import { ProseMirrorEditor, ProseMirrorEditorHandle } from './ProseMirrorEditor';
 import { KeyOutput } from '../../core/editor/gurmukhiKeyboardMappings';
+import { SearchState } from '../../core/editor/searchPlugin';
 import {
   ScriptDraft,
   ScreenplayBlock,
@@ -36,6 +37,7 @@ interface ScreenplayCanvasProps {
   onToggleTitlePageExpand?: () => void;
   highlightCharacters?: HighlightCharactersSetting;
   isModalOpen?: boolean;
+  onSearchStateChange?: (state: SearchState) => void;
 }
 
 export const ScreenplayCanvas = React.forwardRef<ProseMirrorEditorHandle, ScreenplayCanvasProps>(
@@ -60,6 +62,7 @@ export const ScreenplayCanvas = React.forwardRef<ProseMirrorEditorHandle, Screen
       onToggleTitlePageExpand,
       highlightCharacters,
       isModalOpen = false,
+      onSearchStateChange,
     },
     ref
   ) => {
@@ -81,6 +84,21 @@ export const ScreenplayCanvas = React.forwardRef<ProseMirrorEditorHandle, Screen
       },
       getSelectedBlocks: () => {
         return editorRef.current?.getSelectedBlocks() || null;
+      },
+      setSearch: (query: string, caseSensitive?: boolean, wholeWord?: boolean) => {
+        editorRef.current?.setSearch(query, caseSensitive, wholeWord);
+      },
+      findNext: () => {
+        editorRef.current?.findNext();
+      },
+      findPrev: () => {
+        editorRef.current?.findPrev();
+      },
+      clearSearch: () => {
+        editorRef.current?.clearSearch();
+      },
+      setBlockType: (type) => {
+        editorRef.current?.setBlockType(type);
       },
     }));
 
@@ -138,6 +156,7 @@ export const ScreenplayCanvas = React.forwardRef<ProseMirrorEditorHandle, Screen
               }}
               highlightCharacters={highlightCharacters}
               isModalOpen={isModalOpen}
+              onSearchStateChange={onSearchStateChange}
             />
           </div>
         </div>

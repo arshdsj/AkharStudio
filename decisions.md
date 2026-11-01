@@ -164,6 +164,24 @@ Formally accepted the Phase 4 certified export architecture covering W4 & W5b:
 6. **Concurrency Safety (`EXPORT-01`)**:
    - Export processes operate exclusively on immutable project snapshots, ensuring live typing never corrupts an ongoing export.
 
+## DEC-035 — Phase 5 In-Draft Search, Accessibility Hardening & Standalone Desktop Packaging (Accepted)
+Formally accepted the Phase 5 release architecture covering W5, W6, and W7:
+1. **In-Draft Search Engine (`ORG-04` P0, `T-12`, `TM-14`)**:
+   - Keyboard-accessible find bar (`Cmd+F` / `Ctrl+F` and Header icon).
+   - Non-destructive ProseMirror decoration overlays (`.search-match` and `.search-match-active`).
+   - Match navigation (`findNextMatch` / `findPrevMatch`) with wrap-around and live count (`X of Y`).
+   - Case-sensitivity and whole-word toggles with Unicode-aware boundary handling (`\p{P}|\s`).
+   - Strict NFC normalization ensuring NFD search strings match NFC document text.
+   - Transliteration buffer isolation: active composition buffers are never matched as committed text.
+2. **Accessibility & Hardening (`A11Y-01`, `REL-01`, `ERR-01`)**:
+   - Full ARIA 1.2 modal dialog compliance: `role="dialog"`, `aria-modal="true"`, and `aria-labelledby` across all modals (`ExportModal`, `ProjectLibraryModal`, `RecoveryModal`, `HelpShortcutsModal`, `ContdPromptModal`).
+   - Focus management: Escape dismisses dialogs and returns focus to active editor block.
+   - Non-destructive crash recovery prompts and actionable save/backup error messages.
+3. **Standalone Desktop Packaging (`W7`)**:
+   - Production packaging with `electron-builder` targeting macOS (`dmg`, `zip`) and Windows (`nsis`, `portable`).
+   - Native file associations registered for `.scriptproject` files.
+   - 100% offline verification: fonts (`Noto Sans Gurmukhi`, `Courier Prime`) and 100k lexicon bundled locally with zero external network calls.
+
 ---
 
 ## Open decisions (owner / trigger)

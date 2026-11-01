@@ -21,7 +21,7 @@ export const ContdPromptModal: React.FC<ContdPromptModalProps> = ({
 
   return (
     <div className="ds-scrim">
-      <div className="ds-dialog" role="dialog" aria-labelledby="contd-title">
+      <div className="ds-dialog" role="dialog" aria-modal="true" aria-labelledby="contd-title">
         <div className="ds-dialog__header">
           <span id="contd-title">Repeated Character Dialogue (CONT&apos;D)</span>
         </div>

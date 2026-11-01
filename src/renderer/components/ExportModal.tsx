@@ -108,7 +108,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="ds-dialog" role="dialog" aria-labelledby="dlg-title">
+      <div className="ds-dialog" role="dialog" aria-modal="true" aria-labelledby="dlg-title">
         {/* Dialog Header */}
         <div className="ds-dialog__header">
           <span id="dlg-title">Export</span>

@@ -26,23 +26,45 @@ export const SCREENPLAY_ENTER_TRANSITIONS: Record<ScreenplayBlockType, Screenpla
  */
 export function setBlockType(type: ScreenplayBlockType): Command {
   return (state: EditorState, dispatch?: (tr: Transaction) => void): boolean => {
-    const { $from } = state.selection;
-    const blockPos = $from.before(1);
-    const node = state.doc.nodeAt(blockPos);
+    const { from, to } = state.selection;
+    const blocksToConvert: { pos: number; node: any }[] = [];
 
-    if (!node || node.type !== screenplaySchema.nodes.screenplay_block) {
+    state.doc.nodesBetween(from, to, (node, pos) => {
+      if (node.type === screenplaySchema.nodes.screenplay_block) {
+        blocksToConvert.push({ pos, node });
+        return false;
+      }
+      return true;
+    });
+
+    if (blocksToConvert.length === 0) {
+      const { $from } = state.selection;
+      if ($from.depth >= 1) {
+        const blockPos = $from.before(1);
+        const node = state.doc.nodeAt(blockPos);
+        if (node && node.type === screenplaySchema.nodes.screenplay_block) {
+          blocksToConvert.push({ pos: blockPos, node });
+        }
+      }
+    }
+
+    if (blocksToConvert.length === 0) {
       return false;
     }
 
-    if (node.attrs.type === type) {
+    const needsChange = blocksToConvert.some((b) => b.node.attrs.type !== type);
+    if (!needsChange) {
       return true; // Already this type
     }
 
     if (dispatch) {
-      const tr = state.tr.setNodeMarkup(blockPos, undefined, {
-        ...node.attrs,
-        type,
-      });
+      let tr = state.tr;
+      for (const { pos, node } of blocksToConvert) {
+        tr = tr.setNodeMarkup(pos, undefined, {
+          ...node.attrs,
+          type,
+        });
+      }
       dispatch(tr);
     }
     return true;

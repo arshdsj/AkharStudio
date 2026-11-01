@@ -60,18 +60,18 @@ export const ELEMENT_PICKER_OPTIONS: ElementPickerOption[] = [
     icon: <Quote size={14} />,
   },
   {
-    type: 'transition',
-    label: 'Transition',
-    badge: 'T',
-    shortcut: '6',
-    icon: <ArrowRight size={14} />,
-  },
-  {
     type: 'shot',
     label: 'Shot',
     badge: 'SH',
-    shortcut: '7',
+    shortcut: '6',
     icon: <Camera size={14} />,
+  },
+  {
+    type: 'transition',
+    label: 'Transition',
+    badge: 'T',
+    shortcut: '7',
+    icon: <ArrowRight size={14} />,
   },
 ];
 

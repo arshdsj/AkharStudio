@@ -1,9 +1,10 @@
 {
   "name": "punjabi-script-writer",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "private": true,
   "description": "Desktop-first, local-first Punjabi screenplay editor",
+  "author": "Arsh DSJ",
   "main": "dist-electron/main.cjs",
   "engines": {
     "node": ">=22.0.0"
@@ -36,7 +37,16 @@
     "asarUnpack": [
       "**/better-sqlite3/**"
     ],
+    "fileAssociations": [
+      {
+        "ext": "scriptproject",
+        "name": "Punjabi Script Project",
+        "description": "Punjabi Screenplay Editor Project Bundle",
+        "role": "Editor"
+      }
+    ],
     "win": {
+      "icon": "assets/icon.ico",
       "target": [
         {
           "target": "nsis",
@@ -53,6 +63,7 @@
       ]
     },
     "mac": {
+      "icon": "assets/icon.icns",
       "target": [
         "dmg",
         "zip"

@@ -20,6 +20,7 @@ const fsManager = new FileSystemManager(userDataPath);
 const dbManager = new DatabaseManager(path.join(userDataPath, 'database'));
 
 function createWindow() {
+  const iconPath = path.join(__dirname, '../assets/icon.png');
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 900,
@@ -27,6 +28,7 @@ function createWindow() {
     minHeight: 640,
     backgroundColor: '#0d0e12',
     title: 'AkharStudio',
+    icon: fs.existsSync(iconPath) ? iconPath : undefined,
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     trafficLightPosition: { x: 16, y: 16 },
     webPreferences: {
