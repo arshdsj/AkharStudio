@@ -9,8 +9,9 @@ const rootDir = path.resolve(__dirname, '..');
 
 const platform = process.platform;
 const arch = process.arch;
+const currentAbi = process.versions.modules;
 
-console.log(`Ensuring SQLite native bindings for platform: ${platform}, arch: ${arch}...`);
+console.log(`Ensuring SQLite native bindings for platform: ${platform}, arch: ${arch}, Node ABI: ${currentAbi}...`);
 
 const betterSqliteDir = path.join(rootDir, 'node_modules/better-sqlite3');
 const bindingsBaseDir = path.join(betterSqliteDir, 'lib/binding');
@@ -23,7 +24,7 @@ if (!fs.existsSync(betterSqliteDir)) {
 const electronBindingDir = path.join(bindingsBaseDir, `node-v130-${platform}-${arch}`);
 const electronBindingFile = path.join(electronBindingDir, 'better_sqlite3.node');
 
-const nodeBindingDir = path.join(bindingsBaseDir, `node-v127-${platform}-${arch}`);
+const nodeBindingDir = path.join(bindingsBaseDir, `node-v${currentAbi}-${platform}-${arch}`);
 const nodeBindingFile = path.join(nodeBindingDir, 'better_sqlite3.node');
 
 // 1. Check if Electron binding is already stored
@@ -38,9 +39,9 @@ if (!fs.existsSync(electronBindingFile)) {
   }
 }
 
-// 2. Check if Node 22 binding is already stored
+// 2. Check if current Node binding is already stored
 if (!fs.existsSync(nodeBindingFile)) {
-  console.log('Rebuilding better-sqlite3 for Node (ABI 127)...');
+  console.log(`Rebuilding better-sqlite3 for Node (ABI ${currentAbi})...`);
   execSync('npm rebuild better-sqlite3', { cwd: rootDir, stdio: 'inherit' });
   const releaseNode = path.join(betterSqliteDir, 'build/Release/better_sqlite3.node');
   if (fs.existsSync(releaseNode)) {

@@ -5,6 +5,9 @@
   "private": true,
   "description": "Desktop-first, local-first Punjabi screenplay editor",
   "main": "dist-electron/main.cjs",
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "scripts": {
     "dev": "vite",
     "dev:electron": "node scripts/dev.js",

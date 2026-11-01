@@ -35,6 +35,7 @@ export function getMatchingNativeBinding(): string | undefined {
     path.resolve(__dirname, `../node_modules/better-sqlite3/lib/binding/${targetName}/better_sqlite3.node`),
     path.resolve(__dirname, `../../node_modules/better-sqlite3/lib/binding/${targetName}/better_sqlite3.node`),
     path.resolve(__dirname, `../../../node_modules/better-sqlite3/lib/binding/${targetName}/better_sqlite3.node`),
+    path.resolve(__dirname, `../../../../node_modules/better-sqlite3/lib/binding/${targetName}/better_sqlite3.node`),
   ];
 
   for (const candidate of candidates) {
