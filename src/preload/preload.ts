@@ -8,6 +8,7 @@ import {
   ScriptProject,
   RecentProject,
   RecoverySnapshot,
+  SessionRecoveryCheckpoint,
   PaperSize,
   ScriptDraft,
   DatabaseProjectSummary,
@@ -60,6 +61,13 @@ export interface ElectronAPI {
   importFountainDialog: () => Promise<{ filePath: string; content: string } | null>;
   exportProjectBundleDialog: (defaultTitle: string, project: ScriptProject) => Promise<ExportResult>;
   importProjectBundleDialog: () => Promise<{ filePath: string; content: string } | null>;
+
+  // Session Recovery & Lifecycle (Stage 1)
+  saveSessionCheckpoint: (checkpoint: SessionRecoveryCheckpoint) => Promise<boolean>;
+  checkInterruptedSession: () => Promise<SessionRecoveryCheckpoint | null>;
+  clearSessionCheckpoint: () => Promise<boolean>;
+  confirmQuit: (options?: { forceQuit?: boolean }) => Promise<boolean>;
+  onRequestClose: (callback: () => void) => () => void;
 }
 
 const api: ElectronAPI = {
@@ -117,6 +125,17 @@ const api: ElectronAPI = {
   exportProjectBundleDialog: (defaultTitle, project) =>
     ipcRenderer.invoke('storage:export-bundle-dialog', defaultTitle, project),
   importProjectBundleDialog: () => ipcRenderer.invoke('storage:import-bundle-dialog'),
+
+  // Session Recovery & Lifecycle (Stage 1)
+  saveSessionCheckpoint: (checkpoint) => ipcRenderer.invoke('app:save-session-checkpoint', checkpoint),
+  checkInterruptedSession: () => ipcRenderer.invoke('app:check-interrupted-session'),
+  clearSessionCheckpoint: () => ipcRenderer.invoke('app:clear-session-checkpoint'),
+  confirmQuit: (options) => ipcRenderer.invoke('app:confirm-quit', options),
+  onRequestClose: (callback: () => void) => {
+    const handler = () => callback();
+    ipcRenderer.on('app:request-close', handler);
+    return () => ipcRenderer.removeListener('app:request-close', handler);
+  },
 };
 
 contextBridge.exposeInMainWorld('electronAPI', api);

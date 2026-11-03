@@ -6,6 +6,7 @@
 import React, { useEffect } from 'react';
 import { X, Info } from 'lucide-react';
 import { APP_VERSION, APP_AUTHOR, APP_FULL_NAME } from '../../core/version';
+import { useModalTransition } from '../hooks/useModalTransition';
 
 interface HelpShortcutsModalProps {
   isOpen: boolean;
@@ -23,14 +24,16 @@ export const HelpShortcutsModal: React.FC<HelpShortcutsModalProps> = ({ isOpen, 
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
+  const { mounted, scrimClassName } = useModalTransition(isOpen);
+
+  if (!mounted) return null;
 
   const isMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.userAgent);
   const mod = isMac ? '⌘' : 'Ctrl+';
 
   return (
     <div
-      className="ds-scrim"
+      className={scrimClassName}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}

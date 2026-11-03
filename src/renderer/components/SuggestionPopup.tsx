@@ -80,7 +80,7 @@ export const SuggestionPopup: React.FC<SuggestionPopupProps> = ({
         boxShadow: 'var(--shadow-overlay), inset 0 1px 0 var(--line-edge)',
         borderRadius: 'var(--radius-md)',
       }}
-      className="w-64 max-h-56 overflow-hidden flex flex-col font-sans select-none animate-in fade-in duration-100"
+      className="w-64 max-h-56 overflow-hidden flex flex-col font-sans select-none"
     >
       <div
         className="px-3 py-1.5 uppercase font-semibold flex items-center justify-between"
@@ -110,9 +110,11 @@ export const SuggestionPopup: React.FC<SuggestionPopupProps> = ({
       <div ref={listRef} className="overflow-y-auto p-1 space-y-0.5 max-h-48">
         {items.map((item, idx) => {
           const isSelected = idx === selectedIndex;
+          const key = typeof item === 'string' ? `${item}-${idx}` : (item.id ?? `${item.label || idx}-${idx}`);
+          const label = typeof item === 'string' ? item : item.label;
           return (
             <div
-              key={item.id}
+              key={key}
               onClick={() => onSelect(item)}
               className="px-3 py-1.5 rounded text-xs font-courier cursor-pointer transition-colors flex items-center justify-between"
               style={{
@@ -121,7 +123,7 @@ export const SuggestionPopup: React.FC<SuggestionPopupProps> = ({
                 fontWeight: isSelected ? 'var(--weight-medium)' : 'var(--weight-regular)',
               }}
             >
-              <span>{item.label}</span>
+              <span>{label}</span>
               {isSelected && (
                 <span
                   className="font-sans font-normal"

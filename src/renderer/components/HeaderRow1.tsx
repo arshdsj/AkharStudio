@@ -19,6 +19,7 @@ import {
   Activity,
   FileSpreadsheet,
   Database,
+  Languages,
 } from 'lucide-react';
 import { SaveStatus, ProjectSource } from '../../types/screenplay';
 import { AkharStudioLogo } from './AkharStudioLogo';
@@ -27,11 +28,13 @@ interface HeaderRow1Props {
   title: string;
   onTitleChange: (newTitle: string) => void;
   saveStatus: SaveStatus;
+  autosaveEnabled?: boolean;
   inputMode?: 'pa' | 'en';
   onToggleInputMode?: () => void;
   currentFilePath: string | null;
   projectSource?: ProjectSource;
   onOpenLibrary: () => void;
+  onOpenRomanConverter?: () => void;
   onOpenSearch: () => void;
   onRetrySave: () => void;
   onExpandTitlePage?: () => void;
@@ -48,9 +51,11 @@ export const HeaderRow1: React.FC<HeaderRow1Props> = ({
   title,
   onTitleChange,
   saveStatus,
+  autosaveEnabled = true,
   currentFilePath,
   projectSource = 'database',
   onOpenLibrary,
+  onOpenRomanConverter,
   onOpenSearch,
   onRetrySave,
   onExpandTitlePage,
@@ -133,6 +138,20 @@ export const HeaderRow1: React.FC<HeaderRow1Props> = ({
           <span>Projects</span>
         </button>
 
+        {/* Roman Punjabi to Gurmukhi Paste & Convert button */}
+        {onOpenRomanConverter && (
+          <button
+            type="button"
+            onClick={onOpenRomanConverter}
+            title="Convert Roman Punjabi to Gurmukhi (Paste & Convert)"
+            className="ds-btn ds-btn--quiet flex items-center gap-1.5"
+            style={{ height: 'var(--h-md)', padding: '0 var(--space-2)', fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}
+          >
+            <Languages size={15} />
+            <span>Roman to Gurmukhi</span>
+          </button>
+        )}
+
         <div style={{ width: '1px', height: '16px', background: 'var(--line-separator)' }} />
 
         {/* Project Title Input with Expand Title Page shortcut */}
@@ -193,10 +212,10 @@ export const HeaderRow1: React.FC<HeaderRow1Props> = ({
                 color: 'var(--text-secondary)',
                 fontSize: 'var(--text-xs)',
               }}
-              title="All changes saved to disk"
+              title={autosaveEnabled ? 'All changes saved to disk' : 'All changes saved to disk (Autosave is off)'}
             >
               <Check size={11} strokeWidth={2.5} style={{ color: 'var(--text-secondary)' }} />
-              <span>Saved</span>
+              <span>{autosaveEnabled ? 'Saved' : 'Saved (Manual)'}</span>
             </div>
           )}
 
@@ -224,13 +243,20 @@ export const HeaderRow1: React.FC<HeaderRow1Props> = ({
                 height: 'var(--h-sm)',
                 padding: '0 var(--space-2)',
                 background: 'var(--surface-sunken)',
-                color: 'var(--text-disabled)',
+                color: autosaveEnabled ? 'var(--text-disabled)' : 'var(--text-accent)',
                 fontSize: 'var(--text-xs)',
               }}
-              title="Unsaved changes in document"
+              title={
+                autosaveEnabled
+                  ? 'Unsaved changes in document'
+                  : 'Unsaved changes in document (Autosave is off — manual save required: Cmd/Ctrl+S)'
+              }
             >
-              <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--text-disabled)' }} />
-              <span>Unsaved</span>
+              <span
+                className="w-1.5 h-1.5 rounded-full"
+                style={{ background: autosaveEnabled ? 'var(--text-disabled)' : 'var(--text-accent)' }}
+              />
+              <span>{autosaveEnabled ? 'Unsaved' : 'Unsaved (Manual)'}</span>
             </div>
           )}
 
@@ -352,7 +378,7 @@ export const HeaderRow1: React.FC<HeaderRow1Props> = ({
           {/* Dropdown Menu */}
           {dropdownOpen && (
             <div
-              className="ds-menu absolute right-0 top-full mt-1.5 z-50 animate-in fade-in zoom-in-95 duration-100"
+              className="ds-menu absolute right-0 top-full mt-1.5 z-50"
             >
               <button
                 type="button"

@@ -21,7 +21,7 @@ interface ScreenplayCanvasProps {
   draft: ScriptDraft;
   metadata: TitleMetadata;
   onMetadataChange: (meta: TitleMetadata) => void;
-  onDraftChange: (updatedDraft: ScriptDraft) => void;
+  onDraftChange: (updatedDraft: ScriptDraft, options?: { isLineCompleted?: boolean }) => void;
   contdSetting: ContdSetting;
   inputMode: 'pa' | 'en';
   isVirtualKeyboardOpen?: boolean;
@@ -38,6 +38,7 @@ interface ScreenplayCanvasProps {
   highlightCharacters?: HighlightCharactersSetting;
   isModalOpen?: boolean;
   onSearchStateChange?: (state: SearchState) => void;
+  onDetectRomanPunjabiPaste?: (text: string) => void;
 }
 
 export const ScreenplayCanvas = React.forwardRef<ProseMirrorEditorHandle, ScreenplayCanvasProps>(
@@ -63,6 +64,7 @@ export const ScreenplayCanvas = React.forwardRef<ProseMirrorEditorHandle, Screen
       highlightCharacters,
       isModalOpen = false,
       onSearchStateChange,
+      onDetectRomanPunjabiPaste,
     },
     ref
   ) => {
@@ -75,6 +77,12 @@ export const ScreenplayCanvas = React.forwardRef<ProseMirrorEditorHandle, Screen
       },
       insertText: (text: string) => {
         editorRef.current?.insertText(text);
+      },
+      insertConvertedText: (text: string, mode?: 'cursor' | 'replace-all') => {
+        editorRef.current?.insertConvertedText(text, mode);
+      },
+      hasSelection: () => {
+        return editorRef.current?.hasSelection() ?? false;
       },
       insertKeyOutput: (output: KeyOutput) => {
         editorRef.current?.insertKeyOutput(output);
@@ -178,6 +186,7 @@ export const ScreenplayCanvas = React.forwardRef<ProseMirrorEditorHandle, Screen
               highlightCharacters={highlightCharacters}
               isModalOpen={isModalOpen}
               onSearchStateChange={onSearchStateChange}
+              onDetectRomanPunjabiPaste={onDetectRomanPunjabiPaste}
             />
           </div>
         </div>

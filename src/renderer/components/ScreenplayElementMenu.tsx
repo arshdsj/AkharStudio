@@ -207,7 +207,7 @@ export const ScreenplayElementMenu: React.FC<ScreenplayElementMenuProps> = ({
       aria-label="Screenplay Elements"
       onMouseDown={(e) => e.preventDefault()}
       onPointerDown={(e) => e.preventDefault()}
-      className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 z-50 flex flex-col p-1.5 select-none transition-all"
+      className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 z-50 flex flex-col p-1.5 select-none transition-all animate-in fade-in slide-in-from-bottom-1 duration-150"
       style={{
         width: '204px',
         backgroundColor: 'var(--surface-overlay)',

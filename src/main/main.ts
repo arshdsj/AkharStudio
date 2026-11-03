@@ -8,7 +8,7 @@ import path from 'path';
 import fs from 'fs';
 import { FileSystemManager } from '../core/storage/FileSystemManager';
 import { DatabaseManager } from './database/DatabaseManager';
-import { ScriptProject, PaperSize, ScriptDraft } from '../types/screenplay';
+import { ScriptProject, PaperSize, ScriptDraft, SessionRecoveryCheckpoint } from '../types/screenplay';
 import { getActiveDraft } from '../core/model/ProjectModel';
 import { generateScreenplayHtml, generateCharacterSheetHtml } from '../core/export/pdfExporter';
 import { exportProjectBundle } from '../core/storage/projectBundle';
@@ -18,6 +18,10 @@ app.name = 'AkharStudio';
 app.setName('AkharStudio');
 
 let mainWindow: BrowserWindow | null = null;
+let isQuitting = false;
+let sessionInterruptedOnLaunch = false;
+let startupRecoveryCheckpoint: SessionRecoveryCheckpoint | null = null;
+
 const userDataPath = app.getPath('userData');
 const fsManager = new FileSystemManager(userDataPath);
 const dbManager = new DatabaseManager(path.join(userDataPath, 'database'));
@@ -49,6 +53,13 @@ function createWindow() {
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
+
+  mainWindow.on('close', (e) => {
+    if (!isQuitting) {
+      e.preventDefault();
+      mainWindow?.webContents.send('app:request-close');
+    }
+  });
 
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -283,6 +294,38 @@ ipcMain.handle('storage:check-recovery', async () => {
 
 ipcMain.handle('storage:clear-recovery', async () => {
   await fsManager.clearRecoverySnapshot();
+  return true;
+});
+
+// Stage 1: Session Recovery & Interrupted Session IPC
+ipcMain.handle('app:check-interrupted-session', async () => {
+  if (sessionInterruptedOnLaunch && startupRecoveryCheckpoint) {
+    return startupRecoveryCheckpoint;
+  }
+  return null;
+});
+
+ipcMain.handle('app:save-session-checkpoint', async (_event, checkpoint: SessionRecoveryCheckpoint) => {
+  dbManager.saveSessionRecovery(checkpoint);
+  return true;
+});
+
+ipcMain.handle('app:clear-session-checkpoint', async () => {
+  dbManager.clearSessionRecovery();
+  startupRecoveryCheckpoint = null;
+  sessionInterruptedOnLaunch = false;
+  return true;
+});
+
+ipcMain.handle('app:confirm-quit', async () => {
+  isQuitting = true;
+  dbManager.setCleanShutdown(true);
+  dbManager.clearSessionRecovery();
+  if (mainWindow) {
+    mainWindow.destroy();
+    mainWindow = null;
+  }
+  app.quit();
   return true;
 });
 
@@ -604,6 +647,14 @@ app.whenReady().then(async () => {
     console.warn('Legacy recent projects migration check:', err);
   }
 
+  // Stage 1.C: Distinguish between normal exits and unexpected termination
+  const wasClean = dbManager.isCleanShutdown();
+  startupRecoveryCheckpoint = dbManager.getSessionRecovery();
+  sessionInterruptedOnLaunch = !wasClean && startupRecoveryCheckpoint !== null;
+
+  // Mark current session as active/unclean so crash recovery detects unexpected termination
+  dbManager.setCleanShutdown(false);
+
   createWindow();
 
   app.on('activate', () => {
@@ -613,12 +664,26 @@ app.whenReady().then(async () => {
   });
 });
 
+app.on('before-quit', (e) => {
+  if (!isQuitting) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      e.preventDefault();
+      mainWindow.webContents.send('app:request-close');
+    } else {
+      isQuitting = true;
+      dbManager.setCleanShutdown(true);
+    }
+  }
+});
+
 app.on('will-quit', () => {
+  if (isQuitting) {
+    dbManager.setCleanShutdown(true);
+  }
   dbManager.close();
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  // Stage 1.E: Closing the main window must terminate the application process on all platforms including macOS
+  app.quit();
 });

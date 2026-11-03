@@ -23,6 +23,7 @@ import {
   DiagnosticSession,
 } from '../../core/diagnostics/diagnosticRecorder';
 import { globalUserDict } from '../../core/transliteration/defaultEngine';
+import { useModalTransition } from '../hooks/useModalTransition';
 
 interface DiagnosticModalProps {
   isOpen: boolean;
@@ -117,9 +118,13 @@ export const DiagnosticModal: React.FC<DiagnosticModalProps> = ({ isOpen, onClos
     setTimeout(() => setCopyFeedback(null), 2000);
   };
 
+  const { mounted, scrimClassName } = useModalTransition(isOpen);
+
+  if (!mounted) return null;
+
   return (
     <div
-      className="ds-scrim"
+      className={scrimClassName}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}

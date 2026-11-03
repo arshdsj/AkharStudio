@@ -55,6 +55,7 @@ export interface ProjectSettings {
   spellcheck: boolean; // default false per DEC-020
   showWordCount?: boolean;
   highlightCharacters?: HighlightCharactersSetting;
+  autosave?: boolean;
 }
 
 export interface ScriptDraft {
@@ -134,10 +135,29 @@ export interface BackupImportResult {
   error?: string;
 }
 
+export interface SessionRecoveryCheckpoint {
+  timestamp: string;
+  projectId: string;
+  projectTitle: string;
+  activeDraftId: string;
+  activeDraftName?: string;
+  activeSceneId?: string;
+  activeSceneHeading?: string;
+  cursorPosition?: number;
+  scrollTop?: number;
+  projectSnapshot: ScriptProject;
+}
+
 export interface RecoverySnapshot {
   timestamp: string;
   filePath?: string;
   project: ScriptProject;
+  activeDraftId?: string;
+  activeDraftName?: string;
+  activeSceneId?: string;
+  activeSceneHeading?: string;
+  cursorPosition?: number;
+  scrollTop?: number;
 }
 
 export interface ScreenplayStats {

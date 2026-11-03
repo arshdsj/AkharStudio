@@ -17,6 +17,7 @@ import {
   Search,
 } from 'lucide-react';
 import { CustomDictionary, CustomDictionaryEntry, TSVImportResult } from '../../core/transliteration/customDictionary';
+import { useModalTransition } from '../hooks/useModalTransition';
 
 interface CustomDictionaryModalProps {
   isOpen: boolean;
@@ -202,11 +203,13 @@ export const CustomDictionaryModal: React.FC<CustomDictionaryModalProps> = ({
     );
   });
 
-  if (!isOpen) return null;
+  const { mounted, scrimClassName } = useModalTransition(isOpen);
+
+  if (!mounted) return null;
 
   return (
     <div
-      className="ds-scrim"
+      className={scrimClassName}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}

@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import { ScriptDraft, PaperSize, ContdSetting, HighlightCharactersSetting } from '../../types/screenplay';
 import { APP_VERSION } from '../../core/version';
-import { Info } from 'lucide-react';
+import { Info, Languages, PanelLeftClose } from 'lucide-react';
 
 interface LeftSidebarProps {
   isOpen: boolean;
@@ -19,16 +19,20 @@ interface LeftSidebarProps {
   onContdSettingChange: (setting: ContdSetting) => void;
   showWordCount?: boolean;
   onToggleWordCount?: (show: boolean) => void;
+  autosaveEnabled?: boolean;
+  onToggleAutosave?: (enabled: boolean) => void;
   highlightCharactersSetting?: HighlightCharactersSetting;
   onHighlightCharactersSettingChange?: (settings: HighlightCharactersSetting) => void;
   onOpenHighlightCharacters?: () => void;
   onOpenCustomDictionary: () => void;
+  onOpenRomanConverter?: () => void;
   onOpenHelp: () => void;
   onOpenAbout?: () => void;
   onOpenDiagnostics: () => void;
   onOpenLibrary: () => void;
   draft: ScriptDraft;
   onToggleKeyboard?: () => void;
+  onSceneSwitch?: (sceneBlockId: string) => void;
 }
 
 export const LeftSidebar: React.FC<LeftSidebarProps> = ({
@@ -42,26 +46,29 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   onContdSettingChange,
   showWordCount = true,
   onToggleWordCount = () => {},
+  autosaveEnabled = true,
+  onToggleAutosave = () => {},
   highlightCharactersSetting = { enabled: false, color: 'rgba(167, 139, 250, 0.35)', selectedCharacters: [] },
   onHighlightCharactersSettingChange = () => {},
   onOpenHighlightCharacters = () => {},
   onOpenCustomDictionary,
+  onOpenRomanConverter,
   onOpenHelp,
   onOpenAbout = () => {},
   onOpenDiagnostics,
   onOpenLibrary,
   draft,
   onToggleKeyboard,
+  onSceneSwitch,
 }) => {
   const [activeTab, setActiveTab] = useState<'settings' | 'scenes'>('settings');
-
-  if (!isOpen) return null;
 
   const scenes = draft.blocks
     .map((block, index) => ({ block, originalIndex: index }))
     .filter((item) => item.block.type === 'scene_heading');
 
   const handleJumpToScene = (blockId: string) => {
+    onSceneSwitch?.(blockId);
     const el = document.querySelector(`[data-block-id="${blockId}"]`);
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -73,7 +80,11 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   };
 
   return (
-    <aside className="ds-panel" id="panel" aria-label="Sidebar Navigation and Settings">
+    <div
+      className={`ds-panel-container ${isOpen ? 'is-open' : 'is-closed'}`}
+      aria-hidden={!isOpen}
+    >
+      <aside className="ds-panel" id="panel" aria-label="Sidebar Navigation and Settings">
       {/* Panel Header */}
       <header className="ds-panel__header">
         <span>Panel</span>
@@ -84,7 +95,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
           aria-label="Collapse panel"
           title="Collapse Panel (Cmd/Ctrl+\ or click icon)"
         >
-          <svg><use href="#i-sidebar" /></svg>
+          <PanelLeftClose size={16} />
         </button>
       </header>
 
@@ -240,12 +251,45 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
             </button>
             <p className="ds-help">Highlight dialogue cues, dialogue, and parentheticals.</p>
           </div>
+
+          {/* Autosave Setting (Stage 1.B) */}
+          <div className="ds-field">
+            <label className="ds-switch-row">
+              <span className="ds-label">Autosave</span>
+              <input
+                className="ds-switch"
+                type="checkbox"
+                role="switch"
+                checked={autosaveEnabled}
+                onChange={(e) => onToggleAutosave(e.target.checked)}
+              />
+            </label>
+            <p className="ds-help">
+              {autosaveEnabled
+                ? 'Continuously save script changes while you write.'
+                : 'Autosave disabled. You must save manually (Cmd+S / Ctrl+S). Unsaved changes cannot be recovered through content autosaving.'}
+            </p>
+          </div>
         </section>
 
         {/* Tools Section */}
         <section className="ds-section">
           <h3 className="ds-section__title">Tools</h3>
           <div className="ds-list">
+            {onOpenRomanConverter && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenRomanConverter();
+                }}
+                className="ds-row"
+              >
+                <Languages size={15} className="mr-2" style={{ color: 'var(--text-accent)' }} />
+                <span className="ds-row__label">Roman Punjabi to Gurmukhi</span>
+                <svg className="ds-row__chevron"><use href="#i-chevron" /></svg>
+              </button>
+            )}
             <button type="button" onClick={onOpenCustomDictionary} className="ds-row">
               <svg className="ds-row__icon"><use href="#i-book" /></svg>
               <span className="ds-row__label">Custom dictionary</span>
@@ -320,5 +364,6 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
         )}
       </div>
     </aside>
+    </div>
   );
 };

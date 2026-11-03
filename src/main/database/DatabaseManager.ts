@@ -13,6 +13,7 @@ import {
   ScriptDraft,
   RecentProject,
   DatabaseProjectSummary,
+  SessionRecoveryCheckpoint,
 } from '../../types/screenplay';
 import {
   createDefaultProject,
@@ -204,6 +205,42 @@ export class DatabaseManager {
     const next: 'en' | 'pa' = current === 'en' ? 'pa' : 'en';
     this.setPreference('logo_script_mode', next);
     return next;
+  }
+
+  // -------------------------------------------------------------
+  // Clean Shutdown & Session Recovery (REL-01, Stage 1)
+  // -------------------------------------------------------------
+
+  setCleanShutdown(clean: boolean): void {
+    this.setPreference('last_session_clean_shutdown', clean ? 'true' : 'false');
+  }
+
+  isCleanShutdown(): boolean {
+    const val = this.getPreference('last_session_clean_shutdown', 'true');
+    return val === 'true';
+  }
+
+  saveSessionRecovery(checkpoint: SessionRecoveryCheckpoint): void {
+    this.setPreference('session_recovery_checkpoint', JSON.stringify(checkpoint));
+  }
+
+  getSessionRecovery(): SessionRecoveryCheckpoint | null {
+    const json = this.getPreference('session_recovery_checkpoint');
+    if (!json) return null;
+    try {
+      const parsed = JSON.parse(json) as SessionRecoveryCheckpoint;
+      if (parsed && parsed.projectId && parsed.projectSnapshot) {
+        validateScriptProject(parsed.projectSnapshot);
+        return parsed;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  clearSessionRecovery(): void {
+    this.setPreference('session_recovery_checkpoint', '');
   }
 
   // -------------------------------------------------------------

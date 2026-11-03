@@ -8,7 +8,7 @@ import { EditorState, Transaction, Selection, Plugin, PluginKey } from 'prosemir
 import { EditorView, Decoration, DecorationSet } from 'prosemirror-view';
 import { history } from 'prosemirror-history';
 import { toggleMark } from 'prosemirror-commands';
-import { Mark } from 'prosemirror-model';
+import { Mark, Fragment, Slice, Node as PMNode } from 'prosemirror-model';
 
 import { screenplaySchema } from '../../core/editor/schema';
 import { createScreenplayKeymap } from '../../core/editor/keymap';
@@ -27,6 +27,7 @@ import {
   TransliterationState,
 } from '../../core/editor/transliterationPlugin';
 import { defaultTransliterator } from '../../core/transliteration/defaultEngine';
+import { isLikelyRomanPunjabi } from '../../core/transliteration/textConverter';
 import {
   createVirtualKeyboardPlugin,
   insertVirtualKeyOutput,
@@ -73,6 +74,8 @@ const HIGHLIGHT_COLORS = [
 export interface ProseMirrorEditorHandle {
   focus: () => void;
   insertText: (text: string) => void;
+  insertConvertedText: (text: string, mode?: 'cursor' | 'replace-all') => void;
+  hasSelection: () => boolean;
   insertKeyOutput: (output: KeyOutput) => void;
   backspace: () => void;
   getSelectedBlocks: () => ScreenplayBlock[] | null;
@@ -92,7 +95,7 @@ export interface ProseMirrorEditorHandle {
 
 interface ProseMirrorEditorProps {
   draft: ScriptDraft;
-  onDraftChange: (updatedDraft: ScriptDraft) => void;
+  onDraftChange: (updatedDraft: ScriptDraft, options?: { isLineCompleted?: boolean }) => void;
   contdSetting: ContdSetting;
   inputMode: 'pa' | 'en';
   isVirtualKeyboardOpen?: boolean;
@@ -104,6 +107,7 @@ interface ProseMirrorEditorProps {
   highlightCharacters?: HighlightCharactersSetting;
   isModalOpen?: boolean;
   onSearchStateChange?: (state: SearchState) => void;
+  onDetectRomanPunjabiPaste?: (text: string) => void;
 }
 
 export const ProseMirrorEditor = React.forwardRef<ProseMirrorEditorHandle, ProseMirrorEditorProps>(
@@ -122,6 +126,7 @@ export const ProseMirrorEditor = React.forwardRef<ProseMirrorEditorHandle, Prose
       highlightCharacters,
       isModalOpen = false,
       onSearchStateChange,
+      onDetectRomanPunjabiPaste,
     },
     ref
   ) => {
@@ -164,6 +169,9 @@ export const ProseMirrorEditor = React.forwardRef<ProseMirrorEditorHandle, Prose
 
     const onSearchStateChangeRef = useRef(onSearchStateChange);
     onSearchStateChangeRef.current = onSearchStateChange;
+
+    const onDetectRomanPunjabiPasteRef = useRef(onDetectRomanPunjabiPaste);
+    onDetectRomanPunjabiPasteRef.current = onDetectRomanPunjabiPaste;
 
     // Screenplay Autocomplete state (Character, Scene, Transition)
     const [suggestionState, setSuggestionState] = useState<SuggestionState | null>(null);
@@ -273,6 +281,67 @@ export const ProseMirrorEditor = React.forwardRef<ProseMirrorEditorHandle, Prose
         if (!view) return;
         insertVirtualKeyOutput(view, text);
         view.focus();
+      },
+      insertConvertedText: (text: string, mode: 'cursor' | 'replace-all' = 'cursor') => {
+        const view = viewRef.current;
+        if (!view) return;
+
+        if (mode === 'replace-all') {
+          const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+          const newBlocks: ScreenplayBlock[] = (lines.length > 0 ? lines : ['']).map((l, idx) => ({
+            id: generateId(),
+            type: 'action',
+            text: l,
+            order: idx,
+          }));
+          const newDraft = { ...draftRef.current, blocks: newBlocks, updatedAt: new Date().toISOString() };
+          onDraftChangeRef.current(newDraft);
+          const newDoc = draftToProseMirrorDoc(newDraft);
+          const newState = EditorState.create({
+            doc: newDoc,
+            schema: screenplaySchema,
+            plugins: view.state.plugins,
+          });
+          view.updateState(newState);
+          view.focus();
+          return;
+        }
+
+        // Insert at cursor / replace current selection
+        const { state, dispatch } = view;
+        const { from, to } = state.selection;
+        const lines = text.split(/\r?\n/);
+
+        if (lines.length <= 1) {
+          const tr = state.tr.insertText(text, from, to);
+          dispatch(tr.scrollIntoView());
+        } else {
+          const $from = state.doc.resolve(from);
+          const activeBlockType = ($from.parent?.attrs?.type as ScreenplayBlockType) || 'action';
+
+          const blockNodes: PMNode[] = [];
+          for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            blockNodes.push(
+              screenplaySchema.nodes.screenplay_block.create(
+                {
+                  id: generateId(),
+                  type: i === 0 ? activeBlockType : 'action',
+                },
+                line ? screenplaySchema.text(line) : []
+              )
+            );
+          }
+
+          const slice = new Slice(Fragment.from(blockNodes), 0, 0);
+          const tr = state.tr.replaceSelection(slice);
+          dispatch(tr.scrollIntoView());
+        }
+        view.focus();
+      },
+      hasSelection: () => {
+        const view = viewRef.current;
+        return view ? !view.state.selection.empty : false;
       },
       insertKeyOutput: (output: KeyOutput) => {
         const view = viewRef.current;
@@ -608,7 +677,8 @@ export const ProseMirrorEditor = React.forwardRef<ProseMirrorEditorHandle, Prose
 
           if (tr.docChanged) {
             const updatedDraft = proseMirrorDocToDraft(newState.doc, draftRef.current);
-            onDraftChangeRef.current(updatedDraft);
+            const isLineCompleted = updatedDraft.blocks.length > draftRef.current.blocks.length;
+            onDraftChangeRef.current(updatedDraft, { isLineCompleted });
 
             if (contdSettingRef.current === 'unasked') {
               const analyses = analyzeContdEligibleBlocks(newState.doc);
@@ -685,6 +755,14 @@ export const ProseMirrorEditor = React.forwardRef<ProseMirrorEditorHandle, Prose
             suggestionStateRef.current = null;
             setSuggestionState(null);
           }
+        },
+        handlePaste(_view: EditorView, event: ClipboardEvent) {
+          const text = event.clipboardData?.getData('text/plain');
+          if (text && onDetectRomanPunjabiPasteRef.current && isLikelyRomanPunjabi(text)) {
+            onDetectRomanPunjabiPasteRef.current(text);
+            return true;
+          }
+          return false;
         },
         handleKeyDown(_view, event) {
           // Handle screenplay autocomplete popup if open

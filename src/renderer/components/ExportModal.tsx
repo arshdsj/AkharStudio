@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { PaperSize, ScriptProject, ScreenplayBlock } from '../../types/screenplay';
+import { useModalTransition } from '../hooks/useModalTransition';
 
 export type ExportArea = 'entire_script' | 'selected_pages' | 'highlighted_text' | 'character_sheet';
 
@@ -127,9 +128,13 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     canExport = canExport && hasSelectedText;
   }
 
+  const { mounted, scrimClassName } = useModalTransition(isOpen);
+
+  if (!mounted) return null;
+
   return (
     <div
-      className="ds-scrim"
+      className={scrimClassName}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}

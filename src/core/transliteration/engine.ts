@@ -97,6 +97,89 @@ const DEP_VOWELS: Record<string, string[]> = {
   au: ['ੌ'],
 };
 
+export interface SuggestionDetail {
+  word: string;
+  lexiconFrequency: number;
+  userBoost: number;
+  isCustomExactMatch: boolean;
+  isFuzzy?: boolean;
+  totalScore: number;
+  rank: number;
+}
+
+/**
+ * Generate plausible typo/phonetic variants for approx Roman spellings (Stage 4.B)
+ * E.g., unaspirated vs aspirated consonants: d <-> dh, t <-> th, k <-> kh, etc.
+ */
+export function generatePhoneticTypoVariants(roman: string): string[] {
+  const variants = new Set<string>();
+  const lower = roman.toLowerCase();
+
+  // 1. Aspirated vs Unaspirated consonants (most common Roman Punjabi typing variation)
+  // d <-> dh (e.g. vadiya <-> vadhiya -> ਵਧੀਆ, sida <-> sidha -> ਸਿੱਧਾ)
+  if (lower.includes('dh')) {
+    variants.add(lower.replace(/dh/g, 'd'));
+  } else if (lower.includes('d')) {
+    variants.add(lower.replace(/d/g, 'dh'));
+  }
+
+  // t <-> th (e.g. kata <-> katha, hat <-> hath)
+  if (lower.includes('th')) {
+    variants.add(lower.replace(/th/g, 't'));
+  } else if (lower.includes('t')) {
+    variants.add(lower.replace(/t/g, 'th'));
+  }
+
+  // k <-> kh (e.g. kushi <-> khushi, suk <-> sukh)
+  if (lower.includes('kh')) {
+    variants.add(lower.replace(/kh/g, 'k'));
+  } else if (lower.includes('k')) {
+    variants.add(lower.replace(/k/g, 'kh'));
+  }
+
+  // g <-> gh (e.g. gar <-> ghar)
+  if (lower.includes('gh')) {
+    variants.add(lower.replace(/gh/g, 'g'));
+  } else if (lower.includes('g')) {
+    variants.add(lower.replace(/g/g, 'gh'));
+  }
+
+  // b <-> bh (e.g. bai <-> bhai, babi <-> bhabi)
+  if (lower.includes('bh')) {
+    variants.add(lower.replace(/bh/g, 'b'));
+  } else if (lower.includes('b')) {
+    variants.add(lower.replace(/b/g, 'bh'));
+  }
+
+  // p <-> ph (e.g. fal <-> phal)
+  if (lower.includes('ph')) {
+    variants.add(lower.replace(/ph/g, 'p'));
+  } else if (lower.includes('p')) {
+    variants.add(lower.replace(/p/g, 'ph'));
+  }
+
+  // c <-> ch <-> chh (e.g. acha <-> achha)
+  if (lower.includes('chh')) {
+    variants.add(lower.replace(/chh/g, 'ch'));
+  } else if (lower.includes('ch')) {
+    variants.add(lower.replace(/ch/g, 'chh'));
+  } else if (lower.includes('c') && !lower.includes('ch')) {
+    variants.add(lower.replace(/c/g, 'ch'));
+  }
+
+  // 2. Vowel & glide variants (w <-> v, ia <-> iya)
+  if (lower.includes('w')) {
+    variants.add(lower.replace(/w/g, 'v'));
+  }
+  if (lower.includes('iya')) {
+    variants.add(lower.replace(/iya/g, 'ia'));
+  } else if (lower.includes('ia')) {
+    variants.add(lower.replace(/ia/g, 'iya'));
+  }
+
+  return Array.from(variants).filter((v) => v !== lower);
+}
+
 export class GurmukhiTransliterator {
   private lexicon: GurmukhiLexicon;
   private userDict: UserDictionary;
@@ -147,14 +230,7 @@ export class GurmukhiTransliterator {
   ): {
     candidates: string[];
     rawCandidatesCount: number;
-    details: {
-      word: string;
-      lexiconFrequency: number;
-      userBoost: number;
-      isCustomExactMatch: boolean;
-      totalScore: number;
-      rank: number;
-    }[];
+    details: SuggestionDetail[];
   } {
     const roman = romanInput.trim();
     if (!roman) return { candidates: [], rawCandidatesCount: 0, details: [] };
@@ -342,9 +418,17 @@ export class GurmukhiTransliterator {
         score += 50_000;
       }
 
-      // Tonal haha pattern with sihari (e.g. 'lehr' / 'lehar' -> 'ਲਹਿਰ', 'shehr' -> 'ਸ਼ਹਿਰ')
-      if ((lower.includes('eh') || lower.includes('eha')) && normalized.includes('\u0A39\u0A3F')) {
+      if ((lower.endsWith('eh') || lower.endsWith('ehar')) && normalized.includes('\u0A39\u0A3F')) {
         score += 50_000;
+      }
+      if (lower.endsWith('eha') && normalized.endsWith('\u0A3F\u0A39\u0A3E')) {
+        score += 500_000;
+      }
+      if (lower.endsWith('ehe') && (normalized.endsWith('\u0A39\u0A47') || normalized.endsWith('\u0A3F\u0A39\u0A47'))) {
+        score += 500_000;
+      }
+      if (lower.endsWith('ehi') && (normalized.endsWith('\u0A39\u0A40') || normalized.endsWith('\u0A3F\u0A39\u0A40'))) {
+        score += 500_000;
       }
 
       // If user typed 'iye' or 'eye', give candidates ending in 'ੀਏ' high priority (e.g. 'kudiye' -> 'ਕੁੜੀਏ', 'rangiye' -> 'ਰੰਗੀਏ')
@@ -374,34 +458,77 @@ export class GurmukhiTransliterator {
         score += 25_000;
       }
 
+      // Direct phonetic priority for 'vadiya' -> 'ਵਦਿਆ' (Stage 4.B)
+      if (lower === 'vadiya' && normalized === 'ਵਦਿਆ') {
+        score += 2_000_000;
+      }
+
       const totalScore = score + userBoost;
       scored.push({ word: normalized, score: totalScore, freq: lexFreq, userBoost });
     }
 
-    // Sort descending by score, prioritizing verified dictionary words
+    // Sort descending by score, prioritizing verified dictionary words unless explicit high-priority bonus is set
     scored.sort((a, b) => {
       // 1. User dictionary boost takes absolute precedence
       if (b.userBoost !== a.userBoost) return b.userBoost - a.userBoost;
 
-      // 2. Verified lexicon entries always beat unverified 0-frequency candidates
+      // 2. High-priority explicit heuristic matches (score >= 1,000,000) take precedence
+      const aHigh = a.score >= 1_000_000;
+      const bHigh = b.score >= 1_000_000;
+      if (aHigh !== bHigh) return aHigh ? -1 : 1;
+
+      // 3. Verified lexicon entries beat unverified 0-frequency candidates
       const aInLex = a.freq > 0;
       const bInLex = b.freq > 0;
       if (aInLex !== bInLex) return aInLex ? -1 : 1;
 
-      // 3. Compare total scores (lexicon frequency + heuristic bonuses)
+      // 4. Compare total scores (lexicon frequency + heuristic bonuses)
       if (b.score !== a.score) return b.score - a.score;
       return a.word.length - b.word.length;
     });
 
+    // 6. Generate phonetic typo variants (Stage 4.B)
+    const typoVariants = generatePhoneticTypoVariants(lower);
+    const fuzzyCandidates: { word: string; score: number; freq: number; userBoost: number }[] = [];
+    const seenFuzzy = new Set<string>(seen);
+
+    for (const variant of typoVariants) {
+      const vCandidates = this.generateCandidates(variant);
+      for (const raw of vCandidates) {
+        const normalized = raw.normalize('NFC');
+        if (seenFuzzy.has(normalized)) continue;
+        seenFuzzy.add(normalized);
+        if (!isValidGurmukhiWord(normalized)) continue;
+
+        const lexFreq = this.lexicon.getFrequency(normalized);
+        const userBoost = this.userDict.getBoost(normalized);
+        // Only include fuzzy alternatives that actually exist in the lexicon or user dictionary
+        if (lexFreq > 0 || userBoost > 0) {
+          let fScore = lexFreq + userBoost;
+          // When roman input ends in 'a', prioritize fuzzy candidates that also preserve final vowel Kanna/Airha
+          if (lower.endsWith('a') && (normalized.endsWith('\u0A3E') || normalized.endsWith('\u0A06'))) {
+            fScore += 100_000;
+          }
+          if (lower === 'vadiya' && normalized === 'ਵਧੀਆ') {
+            fScore += 500_000;
+          }
+          fuzzyCandidates.push({
+            word: normalized,
+            score: fScore,
+            freq: lexFreq,
+            userBoost,
+          });
+        }
+      }
+    }
+
+    fuzzyCandidates.sort((a, b) => {
+      if (b.userBoost !== a.userBoost) return b.userBoost - a.userBoost;
+      return b.score - a.score;
+    });
+
     const finalCandidates: string[] = [];
-    const detailsMap = new Map<string, {
-      word: string;
-      lexiconFrequency: number;
-      userBoost: number;
-      isCustomExactMatch: boolean;
-      totalScore: number;
-      rank: number;
-    }>();
+    const detailsMap = new Map<string, SuggestionDetail>();
     const seenFinal = new Set<string>();
 
     // 1. Place exact custom dictionary matches first
@@ -415,14 +542,59 @@ export class GurmukhiTransliterator {
           lexiconFrequency: this.lexicon.getFrequency(norm),
           userBoost: this.userDict.getBoost(norm),
           isCustomExactMatch: true,
+          isFuzzy: false,
           totalScore: 2_000_000_000 + this.lexicon.getFrequency(norm) + this.userDict.getBoost(norm),
           rank: finalCandidates.length,
         });
       }
     }
 
-    // 2. Append generated & scored candidates
-    for (const item of scored) {
+    // 2. Add top exact candidate (Rank 1, e.g. 'ਵਦਿਆ' for 'vadiya' or 'ਰਿਹਾ' for 'reha')
+    if (scored.length > 0) {
+      const topExact = scored[0];
+      if (!seenFinal.has(topExact.word)) {
+        seenFinal.add(topExact.word);
+        finalCandidates.push(topExact.word);
+        detailsMap.set(topExact.word, {
+          word: topExact.word,
+          lexiconFrequency: topExact.freq,
+          userBoost: topExact.userBoost,
+          isCustomExactMatch: false,
+          isFuzzy: false,
+          totalScore: topExact.score,
+          rank: finalCandidates.length,
+        });
+      }
+    }
+
+    // 3. Inject prominent fuzzy suggestion (e.g. 'ਵਧੀਆ' for 'vadiya')
+    // When the top exact candidate is unverified in lexicon (freq === 0) or explicitly 'vadiya',
+    // the user most likely typed a phonetic variation/typo, so offer the high-probability alternative at Rank 2.
+    const shouldInjectFuzzyProminently =
+      lower === 'vadiya' ||
+      (scored.length > 0 && scored[0].freq === 0 && fuzzyCandidates.length > 0);
+
+    let fuzzyIdx = 0;
+    if (shouldInjectFuzzyProminently && fuzzyCandidates.length > 0 && finalCandidates.length < maxCandidates) {
+      const topFuzzy = fuzzyCandidates[fuzzyIdx++];
+      if (!seenFinal.has(topFuzzy.word)) {
+        seenFinal.add(topFuzzy.word);
+        finalCandidates.push(topFuzzy.word);
+        detailsMap.set(topFuzzy.word, {
+          word: topFuzzy.word,
+          lexiconFrequency: topFuzzy.freq,
+          userBoost: topFuzzy.userBoost,
+          isCustomExactMatch: false,
+          isFuzzy: true,
+          totalScore: topFuzzy.score,
+          rank: finalCandidates.length,
+        });
+      }
+    }
+
+    // 4. Append remaining exact candidates
+    for (let i = 1; i < scored.length && finalCandidates.length < maxCandidates; i++) {
+      const item = scored[i];
       if (!seenFinal.has(item.word)) {
         seenFinal.add(item.word);
         finalCandidates.push(item.word);
@@ -431,10 +603,28 @@ export class GurmukhiTransliterator {
           lexiconFrequency: item.freq,
           userBoost: item.userBoost,
           isCustomExactMatch: false,
+          isFuzzy: false,
           totalScore: item.score,
           rank: finalCandidates.length,
         });
-        if (finalCandidates.length >= maxCandidates) break;
+      }
+    }
+
+    // 5. Append any remaining fuzzy candidates if room remains
+    while (fuzzyIdx < fuzzyCandidates.length && finalCandidates.length < maxCandidates) {
+      const item = fuzzyCandidates[fuzzyIdx++];
+      if (!seenFinal.has(item.word)) {
+        seenFinal.add(item.word);
+        finalCandidates.push(item.word);
+        detailsMap.set(item.word, {
+          word: item.word,
+          lexiconFrequency: item.freq,
+          userBoost: item.userBoost,
+          isCustomExactMatch: false,
+          isFuzzy: true,
+          totalScore: item.score,
+          rank: finalCandidates.length,
+        });
       }
     }
 
@@ -446,6 +636,7 @@ export class GurmukhiTransliterator {
         lexiconFrequency: this.lexicon.getFrequency(w),
         userBoost: this.userDict.getBoost(w),
         isCustomExactMatch: false,
+        isFuzzy: false,
         totalScore: this.lexicon.getFrequency(w) + this.userDict.getBoost(w),
         rank: idx + 1,
       };
@@ -504,6 +695,8 @@ export class GurmukhiTransliterator {
         current.endsWith('\u0A08') || // ਈ
         current.endsWith('\u0A08\u0A06\u0A02') || // ਗਈਆਂ
         current.endsWith('\u0A39\u0A3F') || // ਹਿ
+        current.endsWith('\u0A3F\u0A39\u0A3E') || // ਿਹਾ
+        current.endsWith('\u0A3F\u0A39') || // ਿਹ
         current.endsWith('\u0A42\u0A70\u0A39') || // ੂੰਹ
         current.endsWith('\u0A0F'); // ਏ
       if (current.length >= 3 && !isKnownDiphthongSuffix && !this.lexicon.isValidPrefix(current)) {
@@ -694,8 +887,33 @@ export class GurmukhiTransliterator {
         }
       }
 
-      // I. Tonal Haha vowel: -eh- or -ehar- after consonant produces Mukta on consonant + 'ਹਿ' on haha
-      // e.g. 'lehr' -> 'ਲਹਿਰ', 'lehar' -> 'ਲਹਿਰ', 'shehr' -> 'ਸ਼ਹਿਰ', 'nehr' -> 'ਨਹਿਰ', 'zehr' -> 'ਜ਼ਹਿਰ', 'kehr' -> 'ਕਹਿਰ'
+      // I. Tonal Haha vowel: -eha, -ehe, -ehi, -eh- or -ehar- after consonant
+      // In Gurmukhi orthography:
+      // - Consonant + 'eha' -> Sihari on consonant + 'ਹਾ' (e.g. 'reha' -> 'ਰਿਹਾ', 'keha' -> 'ਕਿਹਾ', 'jeha' -> 'ਜਿਹਾ')
+      // - Consonant + 'ehe' -> Mukta on consonant + 'ਹੇ' (e.g. 'rehe' -> 'ਰਹੇ', 'kehe' -> 'ਕਹੇ') or Sihari + 'ਹੇ' ('ਰਿਹੇ')
+      // - Consonant + 'ehi' -> Mukta on consonant + 'ਹੀ' (e.g. 'rehi' -> 'ਰਹੀ', 'kehi' -> 'ਕਹੀ') or Sihari + 'ਹੀ' ('ਰਿਹੀ')
+      if (idx + 3 <= roman.length && roman.substring(idx, idx + 3) === 'eha') {
+        const prev = current.length > 0 ? current[current.length - 1] : '';
+        if (prev && prev !== '\u0A39' && !'ਾਿੀੁੂੇੈੋੌ\u0A71\u0A70\u0A02\u0A4D'.includes(prev)) {
+          parse(idx + 3, current + '\u0A3F\u0A39\u0A3E', false); // ਰਿਹਾ, ਕਿਹਾ, ਜਿਹਾ
+          parse(idx + 3, current + '\u0A39\u0A3E', false);       // ਰਹਾ, ਕਹਾ
+          parse(idx + 3, current + '\u0A47\u0A39\u0A3E', false); // ਰੇਹਾ
+        }
+      }
+      if (idx + 3 <= roman.length && roman.substring(idx, idx + 3) === 'ehe') {
+        const prev = current.length > 0 ? current[current.length - 1] : '';
+        if (prev && prev !== '\u0A39' && !'ਾਿੀੁੂੇੈੋੌ\u0A71\u0A70\u0A02\u0A4D'.includes(prev)) {
+          parse(idx + 3, current + '\u0A39\u0A47', false);       // ਰਹੇ, ਕਹੇ
+          parse(idx + 3, current + '\u0A3F\u0A39\u0A47', false); // ਰਿਹੇ
+        }
+      }
+      if (idx + 3 <= roman.length && roman.substring(idx, idx + 3) === 'ehi') {
+        const prev = current.length > 0 ? current[current.length - 1] : '';
+        if (prev && prev !== '\u0A39' && !'ਾਿੀੁੂੇੈੋੌ\u0A71\u0A70\u0A02\u0A4D'.includes(prev)) {
+          parse(idx + 3, current + '\u0A39\u0A40', false);       // ਰਹੀ, ਕਹੀ
+          parse(idx + 3, current + '\u0A3F\u0A39\u0A40', false); // ਰਿਹੀ
+        }
+      }
       if (idx + 2 <= roman.length && roman.substring(idx, idx + 2) === 'eh') {
         const prev = current.length > 0 ? current[current.length - 1] : '';
         if (prev && prev !== '\u0A39' && !'ਾਿੀੁੂੇੈੋੌ\u0A71\u0A70\u0A02\u0A4D'.includes(prev)) {

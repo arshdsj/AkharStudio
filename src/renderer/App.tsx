@@ -29,6 +29,7 @@ import {
   ProjectSource,
   RecentProject,
   RecoverySnapshot,
+  SessionRecoveryCheckpoint,
   ScreenplayBlock,
   ScreenplayBlockType,
   TitleMetadata,
@@ -38,7 +39,8 @@ import {
 
 import {
   createDefaultProject,
-  cloneDraft,
+  createScriptVersion,
+  getNextVersionNumber,
   deleteDraft,
   getActiveDraft,
   updateProjectTitle,
@@ -49,6 +51,11 @@ import { exportToFountain } from '../core/export/fountainExporter';
 import { importFromFountain } from '../core/export/fountainImporter';
 import { exportProjectBundle, importProjectBundle } from '../core/storage/projectBundle';
 import { AboutModal } from './components/AboutModal';
+import { CloseConfirmationModal } from './components/CloseConfirmationModal';
+import { CreateVersionModal } from './components/CreateVersionModal';
+import { SwitchVersionModal } from './components/SwitchVersionModal';
+import { PasteConvertModal } from './components/PasteConvertModal';
+import { DirectPastePromptModal } from './components/DirectPastePromptModal';
 import { HighlightCharactersModal } from './components/HighlightCharactersModal';
 import { ExportPdfOptions } from './components/ExportModal';
 import { FindBar } from './components/FindBar';
@@ -62,7 +69,26 @@ export const App: React.FC = () => {
   const [currentFilePath, setCurrentFilePath] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('clean');
   const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
-  const [recoverySnapshot, setRecoverySnapshot] = useState<RecoverySnapshot | null>(null);
+  const [recoverySnapshot, setRecoverySnapshot] = useState<RecoverySnapshot | SessionRecoveryCheckpoint | null>(null);
+
+  // Autosave configuration & persistence (Stage 1.B)
+  const [autosaveEnabled, setAutosaveEnabled] = useState<boolean>(() => {
+    if (typeof localStorage !== 'undefined') {
+      const saved = localStorage.getItem('akhar_autosave_enabled');
+      if (saved !== null) return saved === 'true';
+    }
+    return true; // Enabled by default for new installations
+  });
+
+  // Close Confirmation state (Stage 1.D)
+  const [isCloseModalOpen, setIsCloseModalOpen] = useState<boolean>(false);
+  const [isClosingSave, setIsClosingSave] = useState<boolean>(false);
+  const [closeSaveError, setCloseSaveError] = useState<string | null>(null);
+
+  // Script Version Management state (Stage 2)
+  const [isCreateVersionModalOpen, setIsCreateVersionModalOpen] = useState<boolean>(false);
+  const [isSwitchVersionModalOpen, setIsSwitchVersionModalOpen] = useState<boolean>(false);
+  const [pendingTargetVersionId, setPendingTargetVersionId] = useState<string | null>(null);
 
   // Welcome Screen & Launch state (Requirement 6 & 8)
   const [isWelcomeOpen, setIsWelcomeOpen] = useState<boolean>(true);
@@ -109,6 +135,43 @@ export const App: React.FC = () => {
     matches: [],
     activeIndex: -1,
   });
+
+  // Roman Punjabi to Gurmukhi Conversion state (Stage 3)
+  const [isPasteConvertOpen, setIsPasteConvertOpen] = useState<boolean>(false);
+  const [pasteConvertInitialText, setPasteConvertInitialText] = useState<string>('');
+  const [directPastePrompt, setDirectPastePrompt] = useState<{ isOpen: boolean; text: string } | null>(null);
+
+  const handleOpenRomanConverter = useCallback((initialText = '') => {
+    setPasteConvertInitialText(initialText);
+    setIsPasteConvertOpen(true);
+  }, []);
+
+  const handleInsertConvertedText = useCallback((gurmukhiText: string, mode: 'cursor' | 'replace-all' = 'cursor') => {
+    editorRef.current?.insertConvertedText(gurmukhiText, mode);
+  }, []);
+
+  const handleDetectRomanPunjabiPaste = useCallback((text: string) => {
+    setDirectPastePrompt({ isOpen: true, text });
+  }, []);
+
+  const handleDirectPasteConvertAndInsert = useCallback((convertedText: string) => {
+    editorRef.current?.insertConvertedText(convertedText, 'cursor');
+    setDirectPastePrompt(null);
+  }, []);
+
+  const handleDirectPasteOpenInConverter = useCallback((text: string) => {
+    setDirectPastePrompt(null);
+    handleOpenRomanConverter(text);
+  }, [handleOpenRomanConverter]);
+
+  const handleDirectPasteAsIs = useCallback((rawText: string) => {
+    editorRef.current?.insertConvertedText(rawText, 'cursor');
+    setDirectPastePrompt(null);
+  }, []);
+
+  const handleDirectPasteCancel = useCallback(() => {
+    setDirectPastePrompt(null);
+  }, []);
 
   // Diagnostic recording state & toast notifications
   const [isDiagnosticsRecording, setIsDiagnosticsRecording] = useState<boolean>(() =>
@@ -181,6 +244,23 @@ export const App: React.FC = () => {
   const activeDraft = getActiveDraft(project);
   const stats = calculateScreenplayStats(activeDraft);
 
+  // References to eliminate stale closures and prevent save race conditions (Stage 1.A)
+  const projectRef = useRef(project);
+  projectRef.current = project;
+
+  const saveStatusRef = useRef(saveStatus);
+  saveStatusRef.current = saveStatus;
+
+  const autosaveEnabledRef = useRef(autosaveEnabled);
+  autosaveEnabledRef.current = autosaveEnabled;
+
+  const activeBlockRef = useRef(activeBlock);
+  activeBlockRef.current = activeBlock;
+
+  const isSavingInProgressRef = useRef(false);
+  const lastSavedRevisionRef = useRef(project.revision);
+  const lastSavedTimeRef = useRef(Date.now());
+
   // Dynamic current page tracking based on active block in screenplay
   const currentPage = useMemo(() => {
     if (!activeBlock || !activeDraft.blocks.length) return 1;
@@ -249,7 +329,93 @@ export const App: React.FC = () => {
     setExportModalOpen(true);
   }, []);
 
-  // 1. Startup: Check for recovery snapshot & load recent projects
+  // Checkpoint session recorder helper (Stage 1.C)
+  const recordSessionCheckpoint = useCallback(async (projToRecord: ScriptProject) => {
+    if (!window.electronAPI?.saveSessionCheckpoint) return;
+    try {
+      const draft = getActiveDraft(projToRecord);
+      const activeScene = draft.blocks.find(
+        (b) => b.type === 'scene_heading' && (activeBlockRef.current ? b.id === activeBlockRef.current.id : true)
+      );
+      const checkpoint: SessionRecoveryCheckpoint = {
+        timestamp: new Date().toISOString(),
+        projectId: projToRecord.id,
+        projectTitle: projToRecord.title,
+        activeDraftId: projToRecord.activeDraftId,
+        activeDraftName: draft.name,
+        activeSceneId: activeScene?.id,
+        activeSceneHeading: activeScene?.text,
+        projectSnapshot: projToRecord,
+      };
+      await window.electronAPI.saveSessionCheckpoint(checkpoint);
+    } catch (err) {
+      console.warn('Failed to record session checkpoint:', err);
+    }
+  }, []);
+
+  // Transactional flush save with race condition prevention (Stage 1.A)
+  const flushSave = useCallback(
+    async (forcedProj?: ScriptProject): Promise<boolean> => {
+      const targetProj = forcedProj || projectRef.current;
+      if (!window.electronAPI) return false;
+
+      // If not dirty and not forced, save is clean
+      if (!forcedProj && saveStatusRef.current === 'clean') {
+        return true;
+      }
+
+      if (isSavingInProgressRef.current) {
+        return false;
+      }
+
+      const savingRevision = targetProj.revision;
+      isSavingInProgressRef.current = true;
+      setSaveStatus('saving');
+
+      try {
+        await window.electronAPI.dbSaveProject(targetProj);
+        await recordSessionCheckpoint(targetProj);
+        lastSavedRevisionRef.current = savingRevision;
+        lastSavedTimeRef.current = Date.now();
+
+        // Prevent race condition: only transition to 'clean' if no newer edits occurred during the save
+        if (projectRef.current.revision <= savingRevision) {
+          setSaveStatus('clean');
+        } else {
+          setSaveStatus('dirty');
+        }
+
+        const recents = await window.electronAPI.getRecentProjects();
+        setRecentProjects(recents);
+        return true;
+      } catch (err) {
+        console.error('Transactional save error:', err);
+        setSaveStatus('error');
+        throw err;
+      } finally {
+        isSavingInProgressRef.current = false;
+      }
+    },
+    [recordSessionCheckpoint]
+  );
+
+  // Autosave toggle persistence (Stage 1.B)
+  const handleToggleAutosave = useCallback((val: boolean) => {
+    setAutosaveEnabled(val);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('akhar_autosave_enabled', String(val));
+    }
+    setProject((prev) => ({
+      ...prev,
+      settings: {
+        ...prev.settings,
+        autosave: val,
+      },
+    }));
+    showToast(val ? 'Autosave enabled' : 'Autosave disabled (manual save required)');
+  }, [showToast]);
+
+  // 1. Startup: Check for recovery snapshot & load recent projects (Stage 1.C)
   useEffect(() => {
     async function init() {
       if (window.electronAPI) {
@@ -258,10 +424,27 @@ export const App: React.FC = () => {
             const mode = await window.electronAPI.getLaunchLogoMode();
             if (mode) setLogoMode(mode);
           }
-          const snapshot = await window.electronAPI.checkRecovery();
-          if (snapshot) {
-            setRecoverySnapshot(snapshot);
+
+          // Check for interrupted crash session checkpoint first
+          let foundRecovery: SessionRecoveryCheckpoint | RecoverySnapshot | null = null;
+          if (window.electronAPI.checkInterruptedSession) {
+            const interrupted = await window.electronAPI.checkInterruptedSession();
+            if (interrupted && interrupted.projectSnapshot) {
+              foundRecovery = interrupted;
+            }
           }
+
+          if (!foundRecovery && window.electronAPI.checkRecovery) {
+            const snapshot = await window.electronAPI.checkRecovery();
+            if (snapshot && snapshot.project) {
+              foundRecovery = snapshot;
+            }
+          }
+
+          if (foundRecovery) {
+            setRecoverySnapshot(foundRecovery);
+          }
+
           const recents = await window.electronAPI.getRecentProjects();
           setRecentProjects(recents);
         } catch (err) {
@@ -270,6 +453,17 @@ export const App: React.FC = () => {
       }
     }
     init();
+  }, []);
+
+  // Intercept native close requests for close confirmation dialogue (Stage 1.D)
+  useEffect(() => {
+    if (window.electronAPI?.onRequestClose) {
+      const unsubscribe = window.electronAPI.onRequestClose(() => {
+        setCloseSaveError(null);
+        setIsCloseModalOpen(true);
+      });
+      return unsubscribe;
+    }
   }, []);
 
   // Update window title on project title change
@@ -290,33 +484,40 @@ export const App: React.FC = () => {
     [project]
   );
 
-  // Autosave debouncing (REL-01, SAVE-01)
+  // Autosave controller (Debounced + Continuous Typing Max Interval) (Stage 1.A, 1.B)
   useEffect(() => {
-    if (saveStatus !== 'dirty') return;
+    if (!autosaveEnabled || saveStatus !== 'dirty') return;
+
+    // Check if continuous typing interval exceeded maximum of 5000ms
+    const timeSinceLastSave = Date.now() - lastSavedTimeRef.current;
+    if (timeSinceLastSave >= 5000) {
+      flushSave().catch((err) => console.error('Continuous interval save error:', err));
+      return;
+    }
 
     if (autosaveTimeoutRef.current) {
       clearTimeout(autosaveTimeoutRef.current);
     }
 
-    autosaveTimeoutRef.current = setTimeout(async () => {
-      if (window.electronAPI) {
-        try {
-          setSaveStatus('saving');
-          await window.electronAPI.dbSaveProject(project);
-          setSaveStatus('clean');
-        } catch (err) {
-          console.error('Autosave error:', err);
-          setSaveStatus('error');
-        }
+    // Inactivity debounce timer (1200ms)
+    autosaveTimeoutRef.current = setTimeout(() => {
+      flushSave().catch((err) => console.error('Inactivity autosave error:', err));
+    }, 1200);
+
+    // Continuous typing safety timer (guarantees save within 5000ms even if typing never pauses)
+    const continuousTimer = setTimeout(() => {
+      if (saveStatusRef.current === 'dirty') {
+        flushSave().catch((err) => console.error('Periodic max interval save error:', err));
       }
-    }, 1500);
+    }, Math.max(400, 5000 - timeSinceLastSave));
 
     return () => {
       if (autosaveTimeoutRef.current) {
         clearTimeout(autosaveTimeoutRef.current);
       }
+      clearTimeout(continuousTimer);
     };
-  }, [project, saveStatus]);
+  }, [project, saveStatus, autosaveEnabled, flushSave]);
 
   // Actions
   const handleSave = useCallback(async () => {
@@ -601,17 +802,95 @@ export const App: React.FC = () => {
     });
   };
 
-  // Draft management (DRAFT-01)
-  const handleSelectDraft = (draftId: string) => {
-    setProject((prev) => ({
-      ...prev,
-      activeDraftId: draftId,
-    }));
-  };
+  // Script Version Switching (Stage 2.C)
+  const handleSelectDraft = useCallback(
+    async (targetDraftId: string) => {
+      if (targetDraftId === project.activeDraftId) return;
+
+      // If autosave is enabled, flush pending changes before switching
+      if (autosaveEnabledRef.current) {
+        if (saveStatusRef.current === 'dirty') {
+          await flushSave();
+        }
+        setProject((prev) => ({
+          ...prev,
+          activeDraftId: targetDraftId,
+        }));
+        return;
+      }
+
+      // If autosave is disabled and changes are pending, prompt the user
+      if (saveStatusRef.current === 'dirty') {
+        setPendingTargetVersionId(targetDraftId);
+        setIsSwitchVersionModalOpen(true);
+        return;
+      }
+
+      setProject((prev) => ({
+        ...prev,
+        activeDraftId: targetDraftId,
+      }));
+    },
+    [project.activeDraftId, flushSave]
+  );
+
+  // Script Version Creation (Stage 2.A)
+  const handleCreateVersion = useCallback(
+    async (customName?: string) => {
+      if (autosaveEnabledRef.current && saveStatusRef.current === 'dirty') {
+        await flushSave();
+      }
+      const newProj = createScriptVersion(project, project.activeDraftId, customName);
+      commitProjectChange(newProj);
+      if (autosaveEnabledRef.current) {
+        await flushSave(newProj);
+      }
+      const createdDraft = getActiveDraft(newProj);
+      showToast(`Created ${createdDraft.name}`);
+    },
+    [project, commitProjectChange, flushSave, showToast]
+  );
 
   const handleCreateDraft = () => {
-    commitProjectChange(cloneDraft(project, project.activeDraftId));
+    setIsCreateVersionModalOpen(true);
   };
+
+  const handleSaveAndSwitchVersion = useCallback(async () => {
+    if (!pendingTargetVersionId) return;
+    await flushSave();
+    setProject((prev) => ({
+      ...prev,
+      activeDraftId: pendingTargetVersionId,
+    }));
+    setIsSwitchVersionModalOpen(false);
+    setPendingTargetVersionId(null);
+  }, [pendingTargetVersionId, flushSave]);
+
+  const handleDiscardAndSwitchVersion = useCallback(async () => {
+    if (!pendingTargetVersionId) return;
+    if (window.electronAPI) {
+      const loaded = await window.electronAPI.dbGetProject(project.id);
+      if (loaded) {
+        setProject({
+          ...loaded,
+          activeDraftId: pendingTargetVersionId,
+        });
+        setSaveStatus('clean');
+      } else {
+        setProject((prev) => ({
+          ...prev,
+          activeDraftId: pendingTargetVersionId,
+        }));
+      }
+    } else {
+      setProject((prev) => ({
+        ...prev,
+        activeDraftId: pendingTargetVersionId,
+      }));
+    }
+    setIsSwitchVersionModalOpen(false);
+    setPendingTargetVersionId(null);
+  }, [pendingTargetVersionId, project.id]);
 
   const handleDeleteDraft = (draftId: string) => {
     const draftToDelete = project.drafts.find((d) => d.id === draftId);
@@ -628,19 +907,36 @@ export const App: React.FC = () => {
     commitProjectChange(deleteDraft(project, draftId));
   };
 
-  // Draft updates from ProseMirror
+  // Draft updates from ProseMirror (with line completion trigger)
   const handleDraftChange = useCallback(
-    (updatedDraft: ScriptDraft) => {
+    (updatedDraft: ScriptDraft, options?: { isLineCompleted?: boolean }) => {
       const updatedDrafts = project.drafts.map((d) =>
         d.id === updatedDraft.id ? updatedDraft : d
       );
-      commitProjectChange({
+      const nextProject: ScriptProject = {
         ...project,
         drafts: updatedDrafts,
         revision: project.revision + 1,
-      });
+      };
+      commitProjectChange(nextProject);
+
+      // Line completion immediate save trigger (Stage 1.A)
+      if (options?.isLineCompleted && autosaveEnabledRef.current) {
+        flushSave(nextProject).catch((err) =>
+          console.error('Line completion autosave error:', err)
+        );
+      }
     },
-    [project, commitProjectChange]
+    [project, commitProjectChange, flushSave]
+  );
+
+  const handleSceneSwitch = useCallback(
+    (_sceneBlockId: string) => {
+      if (autosaveEnabledRef.current && saveStatusRef.current === 'dirty') {
+        flushSave().catch((err) => console.error('Scene switch autosave error:', err));
+      }
+    },
+    [flushSave]
   );
 
   const handleContdChoice = (choice: ContdSetting) => {
@@ -682,22 +978,70 @@ export const App: React.FC = () => {
     });
   };
 
-  // Recovery modal actions (REL-01)
+  // Recovery modal actions (Stage 1.C, REL-01)
   const handleRestoreRecovery = () => {
     if (recoverySnapshot) {
-      setProject(recoverySnapshot.project);
-      setCurrentFilePath(recoverySnapshot.filePath || null);
-      setRecoverySnapshot(null);
+      const restored =
+        'projectSnapshot' in recoverySnapshot
+          ? recoverySnapshot.projectSnapshot
+          : recoverySnapshot.project;
+
+      setProject(restored);
+      if ('activeDraftId' in recoverySnapshot && recoverySnapshot.activeDraftId) {
+        setProject((p) => ({ ...p, activeDraftId: recoverySnapshot.activeDraftId! }));
+      }
       setSaveStatus('dirty');
+      setRecoverySnapshot(null);
+      if (window.electronAPI?.clearSessionCheckpoint) {
+        window.electronAPI.clearSessionCheckpoint();
+      }
+      showToast('Previous session restored successfully');
     }
   };
 
   const handleDiscardRecovery = async () => {
     setRecoverySnapshot(null);
     if (window.electronAPI) {
-      await window.electronAPI.clearRecovery();
+      if (window.electronAPI.clearSessionCheckpoint) {
+        await window.electronAPI.clearSessionCheckpoint();
+      }
+      if (window.electronAPI.clearRecovery) {
+        await window.electronAPI.clearRecovery();
+      }
     }
+    showToast('Recovery checkpoint discarded');
   };
+
+  // Close confirmation actions (Stage 1.D, 1.E)
+  const handleConfirmClose = useCallback(async () => {
+    setIsCloseModalOpen(false);
+    if (window.electronAPI?.confirmQuit) {
+      await window.electronAPI.confirmQuit();
+    }
+  }, []);
+
+  const handleCloseWithoutSaving = useCallback(async () => {
+    setIsCloseModalOpen(false);
+    if (window.electronAPI?.confirmQuit) {
+      await window.electronAPI.confirmQuit({ forceQuit: true });
+    }
+  }, []);
+
+  const handleSaveAndClose = useCallback(async () => {
+    setIsClosingSave(true);
+    setCloseSaveError(null);
+    try {
+      await flushSave();
+      if (window.electronAPI?.confirmQuit) {
+        await window.electronAPI.confirmQuit();
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setCloseSaveError(msg);
+    } finally {
+      setIsClosingSave(false);
+    }
+  }, [flushSave]);
 
   // Export handlers (EXPORT-01, EXPORT-02, STORE-02)
   const handleExportPdf = async (options: ExportPdfOptions) => {
@@ -862,11 +1206,13 @@ export const App: React.FC = () => {
         title={project.title}
         onTitleChange={handleTitleChange}
         saveStatus={saveStatus}
+        autosaveEnabled={autosaveEnabled}
         inputMode={inputMode}
         onToggleInputMode={() => setInputMode((prev) => (prev === 'pa' ? 'en' : 'pa'))}
         currentFilePath={currentFilePath}
         projectSource={projectSource}
         onOpenLibrary={() => setIsWelcomeOpen(true)}
+        onOpenRomanConverter={handleOpenRomanConverter}
         onOpenSearch={handleOpenSearch}
         onRetrySave={handleSave}
         onExpandTitlePage={() => setIsTitlePageExpanded((prev) => !prev)}
@@ -907,18 +1253,22 @@ export const App: React.FC = () => {
           onPaperSizeChange={handlePaperSizeChange}
           contdSetting={project.settings.contdSetting}
           onContdSettingChange={handleContdChoice}
+          autosaveEnabled={autosaveEnabled}
+          onToggleAutosave={handleToggleAutosave}
           showWordCount={showWordCount}
           onToggleWordCount={handleToggleWordCount}
           highlightCharactersSetting={highlightCharactersSetting}
           onHighlightCharactersSettingChange={handleHighlightCharactersChange}
           onOpenHighlightCharacters={() => setHighlightModalOpen(true)}
           onOpenCustomDictionary={() => setCustomDictionaryOpen(true)}
+          onOpenRomanConverter={handleOpenRomanConverter}
           onOpenHelp={() => setHelpModalOpen(true)}
           onOpenAbout={() => setAboutModalOpen(true)}
           onOpenDiagnostics={() => setDiagnosticModalOpen(true)}
           onOpenLibrary={() => setLibraryModalOpen(true)}
           draft={activeDraft}
           onToggleKeyboard={() => setVirtualKeyboardOpen((prev) => !prev)}
+          onSceneSwitch={handleSceneSwitch}
         />
 
         {/* Screenplay Document Canvas & Scroller */}
@@ -954,9 +1304,15 @@ export const App: React.FC = () => {
             diagnosticModalOpen ||
             customDictionaryOpen ||
             recoverySnapshot !== null ||
+            isCloseModalOpen ||
+            isCreateVersionModalOpen ||
+            isSwitchVersionModalOpen ||
+            isPasteConvertOpen ||
+            Boolean(directPastePrompt?.isOpen) ||
             contdPrompt.isOpen
           }
           onSearchStateChange={setSearchState}
+          onDetectRomanPunjabiPaste={handleDetectRomanPunjabiPaste}
         />
 
         {/* In-Draft Search Bar (ORG-04 P0, A11Y-01) */}
@@ -1102,6 +1458,40 @@ export const App: React.FC = () => {
         onDiscard={handleDiscardRecovery}
       />
 
+      <CloseConfirmationModal
+        isOpen={isCloseModalOpen}
+        autosaveEnabled={autosaveEnabled}
+        saveStatus={saveStatus}
+        projectTitle={project.title}
+        onConfirmClose={handleConfirmClose}
+        onSaveAndClose={handleSaveAndClose}
+        onCloseWithoutSaving={handleCloseWithoutSaving}
+        onCancel={() => setIsCloseModalOpen(false)}
+        isSaving={isClosingSave}
+        saveError={closeSaveError}
+      />
+
+      <CreateVersionModal
+        isOpen={isCreateVersionModalOpen}
+        onClose={() => setIsCreateVersionModalOpen(false)}
+        onCreate={handleCreateVersion}
+        nextVersionNumber={getNextVersionNumber(project)}
+        activeVersionName={activeDraft.name}
+      />
+
+      <SwitchVersionModal
+        isOpen={isSwitchVersionModalOpen}
+        onCancel={() => {
+          setIsSwitchVersionModalOpen(false);
+          setPendingTargetVersionId(null);
+        }}
+        onSaveAndSwitch={handleSaveAndSwitchVersion}
+        onDiscardAndSwitch={handleDiscardAndSwitchVersion}
+        targetVersionName={
+          project.drafts.find((d) => d.id === pendingTargetVersionId)?.name || 'target version'
+        }
+      />
+
       <HelpShortcutsModal
         isOpen={helpModalOpen}
         onClose={() => setHelpModalOpen(false)}
@@ -1126,6 +1516,25 @@ export const App: React.FC = () => {
         onChoice={handleContdChoice}
       />
 
+      {/* Stage 3: Roman Punjabi to Gurmukhi Paste & Convert Modal */}
+      <PasteConvertModal
+        isOpen={isPasteConvertOpen}
+        onClose={() => setIsPasteConvertOpen(false)}
+        onInsert={handleInsertConvertedText}
+        initialText={pasteConvertInitialText}
+        hasSelection={editorRef.current?.hasSelection() ?? false}
+      />
+
+      {/* Stage 3.D: Direct Paste Detection Prompt */}
+      <DirectPastePromptModal
+        isOpen={Boolean(directPastePrompt?.isOpen)}
+        pastedText={directPastePrompt?.text || ''}
+        onConvertAndInsert={handleDirectPasteConvertAndInsert}
+        onOpenInConverter={handleDirectPasteOpenInConverter}
+        onPasteAsIs={handleDirectPasteAsIs}
+        onCancel={handleDirectPasteCancel}
+      />
+
       <ExportModal
         isOpen={exportModalOpen}
         onClose={() => setExportModalOpen(false)}
@@ -1141,19 +1550,18 @@ export const App: React.FC = () => {
       />
 
       {/* Welcome Screen on launch and upon opening Projects (Requirement 6, 7, 8) */}
-      {isWelcomeOpen && (
-        <WelcomeScreen
-          logoMode={logoMode}
-          recentProjects={recentProjects}
-          onNewDatabaseProject={handleNewProject}
-          onOpenExternalFile={handleOpenFile}
-          onOpenRecent={handleOpenRecent}
-          onRestoreBackup={handleRestoreDatabaseBackup}
-          onExportBackup={handleExportDatabaseBackup}
-          canDismiss={true}
-          onDismiss={() => setIsWelcomeOpen(false)}
-        />
-      )}
+      <WelcomeScreen
+        isOpen={isWelcomeOpen}
+        logoMode={logoMode}
+        recentProjects={recentProjects}
+        onNewDatabaseProject={handleNewProject}
+        onOpenExternalFile={handleOpenFile}
+        onOpenRecent={handleOpenRecent}
+        onRestoreBackup={handleRestoreDatabaseBackup}
+        onExportBackup={handleExportDatabaseBackup}
+        canDismiss={true}
+        onDismiss={() => setIsWelcomeOpen(false)}
+      />
 
       {/* Non-intrusive Monochromatic Toast Notification */}
       {toastMessage && (

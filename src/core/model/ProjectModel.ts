@@ -76,6 +76,96 @@ export function createDefaultProject(): ScriptProject {
 }
 
 /**
+ * Calculate next available version number for a project (Stage 2)
+ */
+export function getNextVersionNumber(project: ScriptProject): number {
+  let highest = 0;
+  for (const draft of project.drafts) {
+    const match =
+      draft.name.match(/Version\s*(\d+)/i) ||
+      draft.name.match(/^V(\d+)/i) ||
+      draft.name.match(/Draft\s*(\d+)/i);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (!isNaN(num) && num > highest) {
+        highest = num;
+      }
+    }
+  }
+  return Math.max(highest + 1, project.drafts.length + 1);
+}
+
+/**
+ * Format a human-friendly version display label (Stage 2)
+ */
+export function formatVersionDisplayName(draft: ScriptDraft, index: number): string {
+  if (draft.name.startsWith('Version ') || draft.name.startsWith('V')) {
+    return draft.name;
+  }
+  if (draft.isMain && (draft.name === 'Master Draft' || draft.name === 'Main Draft')) {
+    return `Version 1 — Original`;
+  }
+  return `Version ${index + 1} — ${draft.name}`;
+}
+
+/**
+ * Create a new independent Script Version cloned from the currently active version (Stage 2)
+ */
+export function createScriptVersion(
+  project: ScriptProject,
+  sourceDraftId: string,
+  customVersionName?: string
+): ScriptProject {
+  const sourceDraft = project.drafts.find((d) => d.id === sourceDraftId);
+  if (!sourceDraft) {
+    throw new Error(`Source script version ${sourceDraftId} not found`);
+  }
+
+  const nextVerNumber = getNextVersionNumber(project);
+  let versionName: string;
+  if (customVersionName && customVersionName.trim()) {
+    const trimmed = customVersionName.trim();
+    if (trimmed.toLowerCase().startsWith('version ') || trimmed.toLowerCase().startsWith('v')) {
+      versionName = trimmed;
+    } else {
+      versionName = `Version ${nextVerNumber} — ${trimmed}`;
+    }
+  } else {
+    versionName = `Version ${nextVerNumber}`;
+  }
+
+  const newDraftId = generateId();
+
+  // Deep clone all screenplay elements with fresh unique IDs
+  const clonedBlocks: ScreenplayBlock[] = sourceDraft.blocks.map((block) => ({
+    id: generateId(),
+    type: block.type,
+    text: block.text,
+    formats: block.formats ? block.formats.map((f) => ({ ...f })) : undefined,
+    notes: block.notes,
+    comment: block.comment,
+    annotationLayer: block.annotationLayer,
+  }));
+
+  const newDraft: ScriptDraft = {
+    id: newDraftId,
+    name: versionName,
+    isMain: false,
+    createdAt: new Date().toISOString(),
+    modifiedAt: new Date().toISOString(),
+    sourceDraftId: sourceDraft.id,
+    blocks: clonedBlocks,
+  };
+
+  return {
+    ...project,
+    drafts: [...project.drafts, newDraft],
+    activeDraftId: newDraftId, // Made active immediately per Stage 2.A
+    revision: project.revision + 1,
+  };
+}
+
+/**
  * Clone current active draft into a new independent draft tab (DRAFT-01)
  * + creates an independent new draft by copying selected draft content
  * into a new stable draft ID with source-draft provenance

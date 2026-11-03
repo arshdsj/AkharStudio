@@ -8,6 +8,7 @@ import React, { useEffect } from 'react';
 import { X } from 'lucide-react';
 import { AkharStudioLogo } from './AkharStudioLogo';
 import { APP_VERSION, APP_AUTHOR, APP_FULL_NAME } from '../../core/version';
+import { useModalTransition } from '../hooks/useModalTransition';
 
 interface AboutModalProps {
   isOpen: boolean;
@@ -25,11 +26,13 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
+  const { mounted, scrimClassName } = useModalTransition(isOpen);
+
+  if (!mounted) return null;
 
   return (
     <div
-      className="ds-scrim"
+      className={scrimClassName}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}

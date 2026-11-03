@@ -51,7 +51,7 @@ export const TransliterationPopup: React.FC<TransliterationPopupProps> = ({
         boxShadow: 'var(--shadow-overlay), inset 0 1px 0 var(--line-edge)',
         borderRadius: 'var(--radius-md)',
       }}
-      className="w-72 overflow-hidden font-sans select-none animate-in fade-in zoom-in-95 duration-100"
+      className="w-72 overflow-hidden font-sans select-none"
     >
       {/* Header showing active Roman buffer */}
       <div

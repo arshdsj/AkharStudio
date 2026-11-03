@@ -5,6 +5,7 @@
 
 import React from 'react';
 import { ContdSetting } from '../../types/screenplay';
+import { useModalTransition } from '../hooks/useModalTransition';
 
 interface ContdPromptModalProps {
   isOpen: boolean;
@@ -17,10 +18,12 @@ export const ContdPromptModal: React.FC<ContdPromptModalProps> = ({
   characterName,
   onChoice,
 }) => {
-  if (!isOpen) return null;
+  const { mounted, scrimClassName } = useModalTransition(isOpen);
+
+  if (!mounted) return null;
 
   return (
-    <div className="ds-scrim">
+    <div className={scrimClassName}>
       <div className="ds-dialog" role="dialog" aria-modal="true" aria-labelledby="contd-title">
         <div className="ds-dialog__header">
           <span id="contd-title">Repeated Character Dialogue (CONT&apos;D)</span>

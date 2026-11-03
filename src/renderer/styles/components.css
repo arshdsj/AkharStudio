@@ -19,9 +19,29 @@
 }
 :disabled, [aria-disabled="true"] { color: var(--text-disabled); cursor: default; }
 
-/* ---- Panel shell: SAME size and structure for every tab ----------------- */
+/* ---- Panel shell & container: smooth drawer animation ----------------- */
+.ds-panel-container {
+  height: 100%;
+  flex: none;
+  overflow: hidden;
+  width: var(--panel-width);
+  transition: width 240ms cubic-bezier(0.16, 1, 0.3, 1), visibility 240ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: width;
+}
+.ds-panel-container.is-closed {
+  width: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
 .ds-panel { width: var(--panel-width); height: 100%; display: flex; flex-direction: column;
-            background: var(--surface-panel); min-height: 0; box-shadow: inset -1px 0 0 var(--line-separator); }
+            background: var(--surface-panel); min-height: 0; box-shadow: inset -1px 0 0 var(--line-separator);
+            transform: translateX(0); opacity: 1;
+            transition: transform 240ms cubic-bezier(0.16, 1, 0.3, 1), opacity 200ms ease;
+            will-change: transform, opacity; }
+.ds-panel-container.is-closed > .ds-panel {
+  transform: translateX(-32px);
+  opacity: 0;
+}
 .ds-panel__header { height: var(--panel-header-h); flex: none; display: flex; align-items: center;
             justify-content: space-between; padding: 0 var(--space-2) 0 var(--panel-pad);
             font-size: var(--text-lg); font-weight: var(--weight-semibold); }
@@ -155,11 +175,66 @@
 .ds-empty svg { width: 24px; height: 24px; opacity: .6; }
 .ds-empty__title { color: var(--text-primary); font-weight: var(--weight-medium); }
 
-/* ---- Dialog -------------------------------------------------------------- */
-.ds-scrim { position: fixed; inset: 0; background: var(--surface-scrim); display: grid; place-items: center; z-index: 100; }
-.ds-dialog { width: var(--dialog-width); max-width: calc(100vw - var(--space-8)); background: var(--surface-overlay);
-          border-radius: var(--radius-lg); box-shadow: var(--shadow-overlay), inset 0 1px 0 var(--line-edge);
-          display: flex; flex-direction: column; }
+/* ---- Dialog & Scrim with fluid entrance and exit transitions ------------ */
+.ds-scrim {
+  position: fixed;
+  inset: 0;
+  background: var(--surface-scrim);
+  display: grid;
+  place-items: center;
+  z-index: 100;
+  animation: ds-scrim-in 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.ds-scrim.is-exiting {
+  animation: ds-scrim-out 160ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  pointer-events: none;
+}
+
+.ds-dialog {
+  width: var(--dialog-width);
+  max-width: calc(100vw - var(--space-8));
+  background: var(--surface-overlay);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-overlay), inset 0 1px 0 var(--line-edge);
+  display: flex;
+  flex-direction: column;
+  animation: ds-dialog-in 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.is-exiting .ds-dialog,
+.ds-dialog.is-exiting {
+  animation: ds-dialog-out 160ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes ds-scrim-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes ds-scrim-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes ds-dialog-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+@keyframes ds-dialog-out {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.96) translateY(4px);
+  }
+}
+
 .ds-dialog__header { height: var(--dialog-header-h); display: flex; align-items: center; justify-content: space-between;
           padding: 0 var(--space-3) 0 var(--space-6); font-size: var(--text-lg); font-weight: var(--weight-semibold); }
 .ds-dialog__body { padding: var(--space-2) var(--space-6) var(--space-6); display: flex; flex-direction: column;
@@ -168,10 +243,39 @@
           box-shadow: inset 0 1px 0 var(--line-separator); }
 
 /* ---- Menu / popover (same surface family as dialog) --------------------- */
-.ds-menu { min-width: 200px; padding: var(--space-1); background: var(--surface-overlay); border-radius: var(--radius-md);
-          box-shadow: var(--shadow-overlay), inset 0 1px 0 var(--line-edge); }
+.ds-menu {
+  min-width: 200px;
+  padding: var(--space-1);
+  background: var(--surface-overlay);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-overlay), inset 0 1px 0 var(--line-edge);
+  animation: ds-menu-in 150ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  transform-origin: top right;
+}
 .ds-menu .ds-row { height: var(--h-md); }
 .ds-menu__sep { height: 1px; margin: var(--space-1) var(--space-2); background: var(--line-separator); }
+
+@keyframes ds-menu-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ds-panel-container,
+  .ds-panel-container > .ds-panel,
+  .ds-scrim,
+  .ds-dialog,
+  .ds-menu {
+    animation-duration: 0ms !important;
+    transition-duration: 0ms !important;
+  }
+}
 
 /* ---- Scrollbars: thin, quiet -------------------------------------------- */
 .ds-panel__body { scrollbar-width: thin; scrollbar-color: var(--gray-500) transparent; }

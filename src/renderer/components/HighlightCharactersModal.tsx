@@ -8,6 +8,7 @@
 import React, { useEffect } from 'react';
 import { X, Check, Ban } from 'lucide-react';
 import { HighlightCharactersSetting } from '../../types/screenplay';
+import { useModalTransition } from '../hooks/useModalTransition';
 
 export interface HighlightColorOption {
   id: string;
@@ -80,7 +81,9 @@ export const HighlightCharactersModal: React.FC<HighlightCharactersModalProps> =
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
+  const { mounted, scrimClassName } = useModalTransition(isOpen);
+
+  if (!mounted) return null;
 
   const selectedSet = new Set(
     (settings.selectedCharacters || []).map((c) => c.toUpperCase().trim())
@@ -125,13 +128,13 @@ export const HighlightCharactersModal: React.FC<HighlightCharactersModalProps> =
 
   return (
     <div
-      className="ds-scrim"
+      className={scrimClassName}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div
-        className="ds-dialog flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+        className="ds-dialog flex flex-col overflow-hidden"
         style={{
           width: '420px',
           maxWidth: 'calc(100vw - 32px)',

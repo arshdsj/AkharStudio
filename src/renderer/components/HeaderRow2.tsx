@@ -6,10 +6,12 @@
 import React from 'react';
 import {
   Plus,
-  Sparkles,
+  Pencil,
   FileDown,
   Layers,
   X,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react';
 import { ScriptDraft, PaperSize } from '../../types/screenplay';
 
@@ -63,13 +65,20 @@ export const HeaderRow2: React.FC<HeaderRow2Props> = ({
           className="ds-icon-btn"
           style={sidebarOpen ? { background: 'var(--surface-control)', color: 'var(--text-primary)' } : undefined}
         >
-          <svg style={{ width: '16px', height: '16px' }}><use href="#i-sidebar" /></svg>
+          {sidebarOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
         </button>
 
         <div style={{ width: '1px', height: '16px', background: 'var(--line-separator)' }} />
 
-        {/* Draft Tabs */}
+        {/* Script Versions Label & Tabs (Stage 2) */}
         <div className="flex items-center space-x-1">
+          <span
+            className="text-[11px] font-medium tracking-wide uppercase px-1 select-none"
+            style={{ color: 'var(--text-disabled)' }}
+            title="Script Versions"
+          >
+            Versions:
+          </span>
           {drafts.map((draft) => {
             const isActive = draft.id === activeDraftId;
             return (
@@ -92,7 +101,7 @@ export const HeaderRow2: React.FC<HeaderRow2Props> = ({
                 }}
               >
                 {draft.isMain ? (
-                  <Sparkles size={11} style={{ color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)' }} />
+                  <Pencil size={11} style={{ color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)' }} />
                 ) : (
                   <Layers size={11} style={{ color: 'var(--text-disabled)' }} />
                 )}

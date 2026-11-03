@@ -133,7 +133,7 @@ export const AkharStudioLogo: React.FC<AkharStudioLogoProps> = ({
               : 'ml-1.5 px-1 py-0.2 text-[9px]'
           } font-semibold uppercase tracking-wider text-rose-400/90 bg-rose-500/10 border border-rose-500/20 rounded`}
         >
-          Pro
+          Go
         </span>
       </div>
     </div>

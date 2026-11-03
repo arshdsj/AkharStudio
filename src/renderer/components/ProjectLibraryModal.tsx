@@ -17,6 +17,7 @@ import {
   FileText,
 } from 'lucide-react';
 import { RecentProject } from '../../types/screenplay';
+import { useModalTransition } from '../hooks/useModalTransition';
 
 interface ProjectLibraryModalProps {
   isOpen: boolean;
@@ -57,11 +58,13 @@ export const ProjectLibraryModal: React.FC<ProjectLibraryModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
+  const { mounted, scrimClassName } = useModalTransition(isOpen);
+
+  if (!mounted) return null;
 
   return (
     <div
-      className="ds-scrim"
+      className={scrimClassName}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}

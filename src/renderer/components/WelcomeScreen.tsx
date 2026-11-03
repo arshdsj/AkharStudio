@@ -27,8 +27,10 @@ import {
 import { AkharStudioLogo } from './AkharStudioLogo';
 import { RecentProject } from '../../types/screenplay';
 import { APP_VERSION, APP_AUTHOR } from '../../core/version';
+import { useModalTransition } from '../hooks/useModalTransition';
 
 interface WelcomeScreenProps {
+  isOpen?: boolean;
   logoMode: 'en' | 'pa';
   recentProjects: RecentProject[];
   onNewDatabaseProject: () => void;
@@ -41,6 +43,7 @@ interface WelcomeScreenProps {
 }
 
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
+  isOpen = true,
   logoMode,
   recentProjects,
   onNewDatabaseProject,
@@ -52,6 +55,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   onDismiss = () => {},
 }) => {
   const dialogRef = useRef<HTMLDivElement>(null);
+  const { mounted, scrimClassName } = useModalTransition(isOpen);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -63,9 +67,11 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [canDismiss, onDismiss]);
 
+  if (!mounted) return null;
+
   return (
     <div
-      className="ds-scrim"
+      className={scrimClassName}
       onClick={(e) => {
         if (e.target === e.currentTarget && canDismiss) {
           onDismiss();
