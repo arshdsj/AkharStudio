@@ -54,6 +54,7 @@ import { AboutModal } from './components/AboutModal';
 import { CloseConfirmationModal } from './components/CloseConfirmationModal';
 import { CreateVersionModal } from './components/CreateVersionModal';
 import { SwitchVersionModal } from './components/SwitchVersionModal';
+import { RemoveVersionModal } from './components/RemoveVersionModal';
 import { PasteConvertModal } from './components/PasteConvertModal';
 import { DirectPastePromptModal } from './components/DirectPastePromptModal';
 import { HighlightCharactersModal } from './components/HighlightCharactersModal';
@@ -62,6 +63,12 @@ import { FindBar } from './components/FindBar';
 import { SearchState } from '../core/editor/searchPlugin';
 import { normalizeCharacterName } from '../core/editor/contd';
 import { HighlightCharactersSetting } from '../types/screenplay';
+import { getStoredTheme, setTheme as applyAndSaveTheme, ThemeMode } from './utils/theme';
+import {
+  PaginationEngineSetting,
+  getStoredPaginationEngine,
+  setStoredPaginationEngine,
+} from './utils/paginationSetting';
 
 export const App: React.FC = () => {
   const [project, setProject] = useState<ScriptProject>(() => createDefaultProject());
@@ -89,6 +96,10 @@ export const App: React.FC = () => {
   const [isCreateVersionModalOpen, setIsCreateVersionModalOpen] = useState<boolean>(false);
   const [isSwitchVersionModalOpen, setIsSwitchVersionModalOpen] = useState<boolean>(false);
   const [pendingTargetVersionId, setPendingTargetVersionId] = useState<string | null>(null);
+  const [draftToRemove, setDraftToRemove] = useState<ScriptDraft | null>(null);
+
+  // Application Theme state (Requirement 4)
+  const [theme, setThemeState] = useState<ThemeMode>(() => getStoredTheme());
 
   // Welcome Screen & Launch state (Requirement 6 & 8)
   const [isWelcomeOpen, setIsWelcomeOpen] = useState<boolean>(true);
@@ -135,6 +146,19 @@ export const App: React.FC = () => {
     matches: [],
     activeIndex: -1,
   });
+
+  // Pagination Engine state & persistence (Milestone M2E & M2E.1 Audit)
+  const [paginationEngine, setPaginationEngine] = useState<PaginationEngineSetting>(() =>
+    getStoredPaginationEngine()
+  );
+  const isUnifiedPaginationActive = paginationEngine === 'unified';
+  const [isEditorFallback, setIsEditorFallback] = useState<boolean>(false);
+
+  const handlePaginationEngineChange = (engine: PaginationEngineSetting) => {
+    setPaginationEngine(engine);
+    setStoredPaginationEngine(engine);
+    setIsEditorFallback(false);
+  };
 
   // Roman Punjabi to Gurmukhi Conversion state (Stage 3)
   const [isPasteConvertOpen, setIsPasteConvertOpen] = useState<boolean>(false);
@@ -899,12 +923,21 @@ export const App: React.FC = () => {
 
     const hasContent = draftToDelete.blocks.some((b) => b.text.trim().length > 0);
     if (hasContent) {
-      const confirmed = window.confirm(
-        `Are you sure you want to close and remove "${draftToDelete.name}"?`
-      );
-      if (!confirmed) return;
+      setDraftToRemove(draftToDelete);
+      return;
     }
     commitProjectChange(deleteDraft(project, draftId));
+  };
+
+  const handleConfirmRemoveVersion = () => {
+    if (!draftToRemove) return;
+    commitProjectChange(deleteDraft(project, draftToRemove.id));
+    setDraftToRemove(null);
+  };
+
+  const handleThemeChange = (newTheme: ThemeMode) => {
+    setThemeState(newTheme);
+    applyAndSaveTheme(newTheme);
   };
 
   // Draft updates from ProseMirror (with line completion trigger)
@@ -1078,6 +1111,7 @@ export const App: React.FC = () => {
         customDraft,
         password: options.password,
         preserveCharacterHighlights: options.preserveCharacterHighlights,
+        useUnifiedPagination: isUnifiedPaginationActive && !isEditorFallback,
       });
       if (res.success) {
         console.log('PDF exported successfully to:', res.filePath);
@@ -1269,6 +1303,10 @@ export const App: React.FC = () => {
           draft={activeDraft}
           onToggleKeyboard={() => setVirtualKeyboardOpen((prev) => !prev)}
           onSceneSwitch={handleSceneSwitch}
+          theme={theme}
+          onThemeChange={handleThemeChange}
+          paginationEngine={paginationEngine}
+          onPaginationEngineChange={handlePaginationEngineChange}
         />
 
         {/* Screenplay Document Canvas & Scroller */}
@@ -1307,12 +1345,20 @@ export const App: React.FC = () => {
             isCloseModalOpen ||
             isCreateVersionModalOpen ||
             isSwitchVersionModalOpen ||
+            draftToRemove !== null ||
             isPasteConvertOpen ||
             Boolean(directPastePrompt?.isOpen) ||
             contdPrompt.isOpen
           }
           onSearchStateChange={setSearchState}
           onDetectRomanPunjabiPaste={handleDetectRomanPunjabiPaste}
+          useUnifiedPagination={isUnifiedPaginationActive}
+          onPaginationEngineStatusChange={(status) => {
+            setIsEditorFallback(status.isFallback);
+            if (status.isFallback && status.fallbackReason) {
+              console.warn(`[App] Editor pagination fell back to legacy: ${status.fallbackReason}`);
+            }
+          }}
         />
 
         {/* In-Draft Search Bar (ORG-04 P0, A11Y-01) */}
@@ -1490,6 +1536,13 @@ export const App: React.FC = () => {
         targetVersionName={
           project.drafts.find((d) => d.id === pendingTargetVersionId)?.name || 'target version'
         }
+      />
+
+      <RemoveVersionModal
+        isOpen={Boolean(draftToRemove)}
+        versionName={draftToRemove?.name || ''}
+        onCancel={() => setDraftToRemove(null)}
+        onConfirm={handleConfirmRemoveVersion}
       />
 
       <HelpShortcutsModal

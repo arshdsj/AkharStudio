@@ -5,7 +5,11 @@
 
 import React, { useRef, useImperativeHandle } from 'react';
 import { TitleCard } from './TitleCard';
-import { ProseMirrorEditor, ProseMirrorEditorHandle } from './ProseMirrorEditor';
+import {
+  ProseMirrorEditor,
+  ProseMirrorEditorHandle,
+  PaginationEngineStatus,
+} from './ProseMirrorEditor';
 import { KeyOutput } from '../../core/editor/gurmukhiKeyboardMappings';
 import { SearchState } from '../../core/editor/searchPlugin';
 import {
@@ -39,6 +43,8 @@ interface ScreenplayCanvasProps {
   isModalOpen?: boolean;
   onSearchStateChange?: (state: SearchState) => void;
   onDetectRomanPunjabiPaste?: (text: string) => void;
+  useUnifiedPagination?: boolean;
+  onPaginationEngineStatusChange?: (status: PaginationEngineStatus) => void;
 }
 
 export const ScreenplayCanvas = React.forwardRef<ProseMirrorEditorHandle, ScreenplayCanvasProps>(
@@ -65,11 +71,14 @@ export const ScreenplayCanvas = React.forwardRef<ProseMirrorEditorHandle, Screen
       isModalOpen = false,
       onSearchStateChange,
       onDetectRomanPunjabiPaste,
+      useUnifiedPagination = false,
+      onPaginationEngineStatusChange,
     },
     ref
   ) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const editorRef = useRef<ProseMirrorEditorHandle>(null);
+    const lastSelectionRef = useRef<{ from: number; to: number } | null>(null);
 
     useImperativeHandle(ref, () => ({
       focus: () => {
@@ -153,7 +162,7 @@ export const ScreenplayCanvas = React.forwardRef<ProseMirrorEditorHandle, Screen
 
         {/* Screenplay Paper Card (UI-01, PAGE-01, PAGE-03) */}
         <div
-          className={`screenplay-paper select-text cursor-text ${
+          className={`screenplay-paper ds-page select-text cursor-text shrink-0 ${
             paperSize === 'letter' ? 'paper-letter' : 'paper-a4'
           }`}
           onClick={() => {
@@ -161,7 +170,10 @@ export const ScreenplayCanvas = React.forwardRef<ProseMirrorEditorHandle, Screen
           }}
         >
           {/* Page number at top right (PAGE-03: initial page counter 1.) */}
-          <div className="absolute top-[0.5in] right-[1.0in] text-xs font-courier text-neutral-400 select-none">
+          <div
+            className="absolute top-[0.5in] right-[1.0in] text-xs font-courier select-none"
+            style={{ color: 'var(--text-secondary)' }}
+          >
             1.
           </div>
 
@@ -171,6 +183,7 @@ export const ScreenplayCanvas = React.forwardRef<ProseMirrorEditorHandle, Screen
               ref={editorRef}
               key={draft.id}
               draft={draft}
+              paperSize={paperSize}
               onDraftChange={onDraftChange}
               contdSetting={contdSetting}
               inputMode={inputMode}
@@ -187,6 +200,12 @@ export const ScreenplayCanvas = React.forwardRef<ProseMirrorEditorHandle, Screen
               isModalOpen={isModalOpen}
               onSearchStateChange={onSearchStateChange}
               onDetectRomanPunjabiPaste={onDetectRomanPunjabiPaste}
+              useUnifiedPagination={useUnifiedPagination}
+              onPaginationEngineStatusChange={onPaginationEngineStatusChange}
+              initialSelection={lastSelectionRef.current}
+              onSelectionChange={(sel) => {
+                lastSelectionRef.current = sel;
+              }}
             />
           </div>
         </div>

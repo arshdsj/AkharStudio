@@ -53,6 +53,11 @@ yarn-error.log*
 temp-*.cjs
 temp-*.js
 
+# Test runner temp files
+test/spikes/runners/dist-*.cjs
+test/spikes/runners/*-temp.html
+test/spikes/letter-extracted-text.txt
+
 # Editor directories
 .vscode/
 .idea/

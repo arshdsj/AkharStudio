@@ -1,12 +1,16 @@
 import esbuild from 'esbuild';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { cleanOutdatedBuilds } from './clean-outdated-builds.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..');
 
 async function buildElectron() {
+  // Purge outdated release builds by default
+  cleanOutdatedBuilds();
+
   console.log('Building Electron main and preload scripts...');
   
   await esbuild.build({

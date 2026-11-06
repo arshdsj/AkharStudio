@@ -70,9 +70,15 @@ export const FindBar: React.FC<FindBarProps> = ({
     <div
       role="search"
       aria-label="Find in script"
-      className="absolute top-3 right-6 z-40 flex items-center gap-1.5 px-3 py-1.5 bg-shell-surface/95 backdrop-blur border border-shell-border rounded-lg shadow-xl animate-in fade-in slide-in-from-top-2 duration-150"
+      className="absolute top-3 right-6 z-40 flex items-center gap-1.5 px-3 py-1.5 rounded-lg shadow-xl animate-in fade-in slide-in-from-top-2 duration-150"
+      style={{
+        background: 'var(--surface-overlay)',
+        border: '1px solid var(--line-separator)',
+        boxShadow: 'var(--shadow-overlay)',
+        color: 'var(--text-primary)',
+      }}
     >
-      <Search size={14} className="text-shell-muted shrink-0" aria-hidden="true" />
+      <Search size={14} style={{ color: 'var(--text-secondary)' }} className="shrink-0" aria-hidden="true" />
 
       {/* Search Input */}
       <input
@@ -83,24 +89,26 @@ export const FindBar: React.FC<FindBarProps> = ({
         onKeyDown={handleKeyDown}
         placeholder="Find in script..."
         aria-label="Search term in script"
-        className="w-48 bg-transparent text-xs text-shell-text placeholder-shell-muted/60 focus:outline-none"
+        className="w-48 bg-transparent text-xs focus:outline-none"
+        style={{ color: 'var(--text-primary)' }}
       />
 
       {/* Match Count Indicator */}
       <span
         aria-live="polite"
-        className={`text-[11px] px-1.5 py-0.5 rounded font-mono ${
+        className="text-[11px] px-1.5 py-0.5 rounded font-mono"
+        style={
           matchesCount > 0
-            ? 'text-shell-accent bg-shell-accent/10'
+            ? { background: 'var(--surface-selected)', color: 'var(--text-accent)' }
             : query
-            ? 'text-rose-400 bg-rose-500/10'
-            : 'text-shell-muted'
-        }`}
+            ? { background: 'var(--surface-sunken)', color: 'var(--text-danger)' }
+            : { color: 'var(--text-secondary)' }
+        }
       >
         {currentDisplay}
       </span>
 
-      <div className="w-[1px] h-4 bg-shell-border mx-1" />
+      <div className="w-[1px] h-4 mx-1" style={{ background: 'var(--line-separator)' }} />
 
       {/* Case-sensitive toggle */}
       <button
@@ -109,11 +117,12 @@ export const FindBar: React.FC<FindBarProps> = ({
         title="Match Case (Alt+C)"
         aria-label="Toggle match case"
         aria-pressed={caseSensitive}
-        className={`p-1 rounded text-xs transition-colors ${
+        className="p-1 rounded text-xs transition-colors"
+        style={
           caseSensitive
-            ? 'bg-shell-accent/20 text-shell-accent'
-            : 'text-shell-muted hover:text-shell-text hover:bg-shell-card'
-        }`}
+            ? { background: 'var(--surface-selected)', color: 'var(--text-accent)' }
+            : { color: 'var(--text-secondary)' }
+        }
       >
         <CaseSensitive size={14} />
       </button>
@@ -125,16 +134,17 @@ export const FindBar: React.FC<FindBarProps> = ({
         title="Match Whole Word (Alt+W)"
         aria-label="Toggle match whole word"
         aria-pressed={wholeWord}
-        className={`p-1 rounded text-xs transition-colors ${
+        className="p-1 rounded text-xs transition-colors"
+        style={
           wholeWord
-            ? 'bg-shell-accent/20 text-shell-accent'
-            : 'text-shell-muted hover:text-shell-text hover:bg-shell-card'
-        }`}
+            ? { background: 'var(--surface-selected)', color: 'var(--text-accent)' }
+            : { color: 'var(--text-secondary)' }
+        }
       >
         <WholeWord size={14} />
       </button>
 
-      <div className="w-[1px] h-4 bg-shell-border mx-1" />
+      <div className="w-[1px] h-4 mx-1" style={{ background: 'var(--line-separator)' }} />
 
       {/* Previous match button */}
       <button
@@ -143,7 +153,8 @@ export const FindBar: React.FC<FindBarProps> = ({
         disabled={matchesCount === 0}
         title="Previous Match (Shift+Enter)"
         aria-label="Previous match"
-        className="p-1 rounded text-shell-muted hover:text-shell-text hover:bg-shell-card disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+        className="p-1 rounded transition-colors disabled:opacity-30"
+        style={{ color: 'var(--text-secondary)' }}
       >
         <ChevronUp size={14} />
       </button>
@@ -155,7 +166,8 @@ export const FindBar: React.FC<FindBarProps> = ({
         disabled={matchesCount === 0}
         title="Next Match (Enter)"
         aria-label="Next match"
-        className="p-1 rounded text-shell-muted hover:text-shell-text hover:bg-shell-card disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+        className="p-1 rounded transition-colors disabled:opacity-30"
+        style={{ color: 'var(--text-secondary)' }}
       >
         <ChevronDown size={14} />
       </button>
@@ -166,7 +178,8 @@ export const FindBar: React.FC<FindBarProps> = ({
         onClick={onClose}
         title="Close (Escape)"
         aria-label="Close find bar"
-        className="p-1 ml-1 rounded text-shell-muted hover:text-shell-text hover:bg-shell-card transition-colors"
+        className="p-1 ml-1 rounded transition-colors"
+        style={{ color: 'var(--text-secondary)' }}
       >
         <X size={14} />
       </button>

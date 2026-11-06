@@ -3,8 +3,32 @@
  * Baseline: V9.1, PAGE-01, PAGE-02, PAGE-03, ARCH-04, EXPORT-01, DEC-014
  */
 
-import { PaperSize, ScriptDraft, TitleMetadata, HighlightCharactersSetting } from '../../types/screenplay';
+import {
+  PaperSize,
+  ScriptDraft,
+  TitleMetadata,
+  HighlightCharactersSetting,
+  ContdSetting,
+  ScreenplayBlockType,
+} from '../../types/screenplay';
 import { normalizeCharacterName } from '../editor/contd';
+import {
+  PaginationResult,
+  PageSlotItem,
+  createPaginationEngine,
+  IPaginationEngine,
+  createPageProfile,
+} from '../layout/paginationEngine';
+import { draftToLayoutBlocks, KNOWN_SCREENPLAY_BLOCK_TYPES } from '../layout/paginationAdapter';
+import { createTextLayoutService, ITextLayoutService } from '../layout/textLayoutService';
+import {
+  FontMetricsProvider,
+  getGurmukhiFontMetricsProvider,
+  IFontMetricsProvider,
+  validateFontBuffer,
+  EXPECTED_NOTO_SANS_GURMUKHI,
+  FontValidationResult,
+} from '../layout/fontMetrics';
 
 export interface PdfExportOptions {
   paperSize: PaperSize;
@@ -13,6 +37,13 @@ export interface PdfExportOptions {
   gurmukhiFontBase64?: string;
   highlightCharacters?: HighlightCharactersSetting;
   preserveCharacterHighlights?: boolean;
+  useUnifiedPagination?: boolean;
+  paginationResult?: PaginationResult;
+  contdSetting?: ContdSetting;
+  fontMetricsProvider?: IFontMetricsProvider;
+  textLayoutService?: ITextLayoutService;
+  paginationEngine?: IPaginationEngine;
+  allowHeadlessFallback?: boolean;
 }
 
 export interface PageGeometry {
@@ -59,12 +90,33 @@ export function getPageGeometry(paperSize: PaperSize): PageGeometry {
 /**
  * Generates clean, self-contained HTML for PDF rendering via Chromium printToPDF.
  * Embeds Noto Sans Gurmukhi and Courier Prime fonts for 100% offline certified rendering.
+ * Supports legacy flow (default) and unified pagination flow (useUnifiedPagination: true).
  */
 export function generateScreenplayHtml(
   draft: ScriptDraft,
   metadata: TitleMetadata,
   options: PdfExportOptions
 ): string {
+  if (options.useUnifiedPagination) {
+    const hasUnsupportedBlocks =
+      Array.isArray(draft.blocks) &&
+      draft.blocks.some((b) => !KNOWN_SCREENPLAY_BLOCK_TYPES.has(b.type));
+
+    if (hasUnsupportedBlocks) {
+      console.warn(
+        '[PdfExporter] Unsupported screenplay block type detected in draft. Falling back to legacy PDF export to ensure 100% content preservation.'
+      );
+    } else {
+      try {
+        return generateUnifiedScreenplayPdfHtml(draft, metadata, options);
+      } catch (err) {
+        console.warn(
+          `[PdfExporter] Unified PDF export failed (${err instanceof Error ? err.message : String(err)}). Falling back to legacy PDF export.`
+        );
+      }
+    }
+  }
+
   const geometry = getPageGeometry(options.paperSize);
 
   // Embed base64 fonts if provided
@@ -388,6 +440,501 @@ function escapeHtml(text: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function getBlockCssClass(type: ScreenplayBlockType): string {
+  switch (type) {
+    case 'scene_heading':
+      return 'scene-heading';
+    case 'action':
+      return 'action';
+    case 'character':
+      return 'character';
+    case 'parenthetical':
+      return 'parenthetical';
+    case 'dialogue':
+      return 'dialogue';
+    case 'transition':
+      return 'transition';
+    case 'shot':
+      return 'shot';
+    default:
+      return 'action';
+  }
+}
+
+/**
+ * Validates embedded font base64 buffers for PDF export against expected TrueType identity.
+ */
+export async function validateExportFonts(options: {
+  gurmukhiFontBase64?: string;
+  courierFontBase64?: string;
+}): Promise<FontValidationResult> {
+  if (options.gurmukhiFontBase64) {
+    const fontBuffer = Buffer.from(options.gurmukhiFontBase64, 'base64');
+    const result = await validateFontBuffer(fontBuffer.buffer, EXPECTED_NOTO_SANS_GURMUKHI);
+    if (!result.valid) {
+      return result;
+    }
+  }
+  return { valid: true };
+}
+
+/**
+ * Generates unified screenplay PDF HTML where each physical sheet is rendered as a discrete
+ * container dictated 100% by the unified PaginationResult.
+ *
+ * Guaranteed Properties:
+ * 1. Zero Chromium automatic pagination: page breaks are discrete .page-sheet elements.
+ * 2. 18.0pt strict line-box baseline pitch across all elements.
+ * 3. Exact matching of editor pagination decisions, block assignments, and dialogue splits.
+ * 4. Presentation-only (MORE) and (CONT'D) labels with 0 canonical data mutations.
+ * 5. Full-width margin isolation and running headers.
+ */
+export function generateUnifiedScreenplayPdfHtml(
+  draft: ScriptDraft,
+  metadata: TitleMetadata,
+  options: PdfExportOptions
+): string {
+  const geometry = getPageGeometry(options.paperSize);
+
+  // Embed base64 fonts if provided
+  const courierFontFace = options.courierFontBase64
+    ? `@font-face {
+        font-family: 'Courier Prime';
+        src: url(data:font/truetype;charset=utf-8;base64,${options.courierFontBase64}) format('truetype');
+        font-weight: normal;
+        font-style: normal;
+      }`
+    : '';
+
+  const gurmukhiFontFace = options.gurmukhiFontBase64
+    ? `@font-face {
+        font-family: 'Noto Sans Gurmukhi';
+        src: url(data:font/truetype;charset=utf-8;base64,${options.gurmukhiFontBase64}) format('truetype');
+        font-weight: 100 900;
+        font-style: normal;
+      }`
+    : '';
+
+  // 1. Title Page HTML
+  const titlePageHtml = options.includeTitlePage
+    ? `
+    <div class="page-sheet title-page" id="title-page">
+      <div class="title-top-space"></div>
+      <div class="title-center-block">
+        ${metadata.titleImageUrl ? `<div class="title-artwork-container"><img src="${metadata.titleImageUrl}" class="title-artwork" alt="Script Title Artwork" /></div>` : ''}
+        <h1 class="title-text">${escapeHtml(metadata.title || 'UNTITLED')}</h1>
+        <p class="title-written-by">${metadata.basedOn ? escapeHtml(metadata.basedOn) : 'ਵੱਲੋਂ / by'}</p>
+        <p class="title-author">${escapeHtml(metadata.author || '')}</p>
+      </div>
+      <div class="title-bottom-block">
+        <div class="title-meta-left">
+          ${metadata.rights ? `<p>${escapeHtml(metadata.rights)}</p>` : ''}
+          ${metadata.contact ? `<p class="contact-text">${escapeHtml(metadata.contact)}</p>` : ''}
+        </div>
+      </div>
+    </div>
+    `
+    : '';
+
+  // 2. Pre-calculate Highlighted Blocks
+  const highlightCfg = options.highlightCharacters;
+  const isHighlightActive = Boolean(
+    highlightCfg &&
+    highlightCfg.enabled &&
+    highlightCfg.selectedCharacters &&
+    highlightCfg.selectedCharacters.length > 0 &&
+    options.preserveCharacterHighlights !== false
+  );
+
+  const selectedCharSet = isHighlightActive
+    ? new Set(highlightCfg!.selectedCharacters.map((c) => c.toUpperCase().trim()))
+    : new Set<string>();
+  const highlightColor = highlightCfg?.color || 'rgba(167, 139, 250, 0.35)';
+
+  const highlightedBlockIds = new Set<string>();
+  if (isHighlightActive) {
+    let currentSpeaker: string | null = null;
+    for (const block of draft.blocks) {
+      if (block.type === 'scene_heading') {
+        currentSpeaker = null;
+      } else if (block.type === 'character') {
+        const charName = normalizeCharacterName(block.text);
+        if (charName && selectedCharSet.has(charName)) {
+          currentSpeaker = charName;
+          highlightedBlockIds.add(block.id);
+        } else {
+          currentSpeaker = null;
+        }
+      } else if (currentSpeaker && (block.type === 'dialogue' || block.type === 'parenthetical')) {
+        highlightedBlockIds.add(block.id);
+      } else {
+        currentSpeaker = null;
+      }
+    }
+  }
+
+  // 3. Resolve PaginationResult
+  let paginationResult = options.paginationResult;
+  if (!paginationResult) {
+    const layoutBlocks = draftToLayoutBlocks(draft);
+    const engine = options.paginationEngine ?? createPaginationEngine();
+    const profile = createPageProfile(options.paperSize);
+
+    let layoutService = options.textLayoutService;
+    if (!layoutService) {
+      let fontMetrics = options.fontMetricsProvider;
+      if (!fontMetrics) {
+        const provider = getGurmukhiFontMetricsProvider();
+        try {
+          // Check if real canvas measurement is available in current environment
+          provider.measureWidth('test');
+          fontMetrics = provider;
+        } catch (ctxErr) {
+          if (!options.allowHeadlessFallback) {
+            throw new Error(
+              `Canvas 2D context is unavailable for certified font measurement in current environment. ` +
+              `Silent fallback to uncertified pitch is prohibited in production PDF export. (${String(ctxErr)})`
+            );
+          }
+          // In explicit headless Node test environments, allow specified fallback
+          fontMetrics = new FontMetricsProvider({
+            measureFn: (text) => Number((text.length * 7.2).toFixed(4)),
+          });
+        }
+      }
+      layoutService = createTextLayoutService(fontMetrics);
+    }
+
+    paginationResult = engine.paginate(layoutBlocks, {
+      profile,
+      paperSize: options.paperSize,
+      contdSetting: options.contdSetting ?? 'on',
+      textLayoutService: layoutService,
+    });
+  }
+
+  // 4. Render Discrete Page Sheets
+  let pagesHtml = '';
+  if (paginationResult.pages.length === 0) {
+    if (!options.includeTitlePage) {
+      pagesHtml = `
+      <div class="page-sheet screenplay-page-sheet" data-page-number="1">
+        <div class="page-content"></div>
+      </div>
+      `;
+    }
+  } else {
+    pagesHtml = paginationResult.pages
+      .map((page) => {
+        const headerHtml = page.hasHeader
+          ? `<div class="page-header">${escapeHtml(page.headerText || `${page.pageNumber}.`)}</div>`
+          : '';
+
+        const slotItems = page.slots;
+        const renderedElements: string[] = [];
+        let i = 0;
+
+        while (i < slotItems.length) {
+          const slot = slotItems[i];
+
+          if (slot.kind === 'blank_line') {
+            renderedElements.push('<div class="slot-line slot-blank-line">&nbsp;</div>');
+            i++;
+            continue;
+          }
+
+          if (slot.kind === 'more') {
+            const moreText = escapeHtml(slot.presentationText || '(MORE)');
+            renderedElements.push(
+              `<div class="slot-line screenplay-more-continuation select-none">${moreText}</div>`
+            );
+            i++;
+            continue;
+          }
+
+          if (slot.kind === 'contd') {
+            const contdText = escapeHtml(slot.presentationText || '');
+            renderedElements.push(
+              `<div class="slot-line character screenplay-contd-continuation">${contdText}</div>`
+            );
+            i++;
+            continue;
+          }
+
+          if (slot.kind === 'text') {
+            const currentBlockId = slot.blockId;
+            const currentBlockType = slot.blockType;
+            const blockSlots: PageSlotItem[] = [];
+
+            while (
+              i < slotItems.length &&
+              slotItems[i].kind === 'text' &&
+              slotItems[i].blockId === currentBlockId
+            ) {
+              blockSlots.push(slotItems[i]);
+              i++;
+            }
+
+            const isHighlighted = highlightedBlockIds.has(currentBlockId);
+            const blockLinesHtml = blockSlots
+              .map((s) => {
+                const rawLineText = s.line ? s.line.text : s.presentationText || '';
+                const escapedLineText = escapeHtml(rawLineText);
+                const content =
+                  isHighlighted && escapedLineText
+                    ? `<span class="character-highlight" style="background-color: ${highlightColor}; -webkit-print-color-adjust: exact; print-color-adjust: exact; border-radius: 2px; padding: 1px 3px;">${escapedLineText}</span>`
+                    : escapedLineText;
+                return `<div class="screenplay-line">${content || '&nbsp;'}</div>`;
+              })
+              .join('\n');
+
+            const blockCssClass = getBlockCssClass(currentBlockType);
+            renderedElements.push(
+              `<div class="screenplay-block ${blockCssClass}" id="${currentBlockId}">\n${blockLinesHtml}\n</div>`
+            );
+          }
+        }
+
+        return `
+        <div class="page-sheet screenplay-page-sheet" data-page-number="${page.pageNumber}">
+          ${headerHtml}
+          <div class="page-content">
+            ${renderedElements.join('\n')}
+          </div>
+        </div>
+        `;
+      })
+      .join('\n');
+  }
+
+  return `<!DOCTYPE html>
+<html lang="pa-Guru">
+<head>
+  <meta charset="UTF-8">
+  <title>${escapeHtml(metadata.title || 'Screenplay')}</title>
+  <style>
+    ${courierFontFace}
+    ${gurmukhiFontFace}
+
+    @page {
+      size: ${geometry.width} ${geometry.height};
+      margin: 0;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #ffffff;
+      color: #000000;
+      font-family: 'Courier Prime', 'Noto Sans Gurmukhi', monospace;
+      font-size: 12pt;
+      line-height: 18pt;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .page-sheet {
+      width: ${geometry.width};
+      height: ${geometry.height};
+      padding: ${geometry.marginTop} ${geometry.marginRight} ${geometry.marginBottom} ${geometry.marginLeft};
+      page-break-after: always;
+      break-after: page;
+      position: relative;
+      overflow: hidden;
+      box-sizing: border-box;
+      background: #ffffff;
+    }
+
+    .page-sheet:last-child {
+      page-break-after: auto;
+      break-after: auto;
+    }
+
+    .page-header {
+      position: absolute;
+      top: 36pt;
+      right: ${geometry.marginRight};
+      font-family: 'Courier Prime', 'Noto Sans Gurmukhi', monospace;
+      font-size: 10pt;
+      line-height: 14pt;
+      text-align: right;
+      color: #000000;
+    }
+
+    .page-content {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    .title-page {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      text-align: center;
+      page-break-after: always;
+      break-after: page;
+    }
+
+    .title-top-space {
+      height: ${metadata.titleImageUrl ? '1.5in' : '2.5in'};
+    }
+
+    .title-center-block {
+      flex: 1;
+    }
+
+    .title-artwork-container {
+      margin: 0 auto 20pt auto;
+      text-align: center;
+    }
+
+    .title-artwork {
+      max-width: 5.5in;
+      max-height: 2.5in;
+      object-fit: contain;
+      display: inline-block;
+    }
+
+    .title-text {
+      font-size: 18pt;
+      font-weight: bold;
+      letter-spacing: 1.5px;
+      margin: 0 0 18pt 0;
+      text-transform: uppercase;
+    }
+
+    .title-written-by {
+      font-size: 12pt;
+      margin: 0 0 6pt 0;
+    }
+
+    .title-author {
+      font-size: 14pt;
+      margin: 0;
+    }
+
+    .title-bottom-block {
+      display: flex;
+      justify-content: space-between;
+      text-align: left;
+      font-size: 10pt;
+      line-height: 13pt;
+      padding-bottom: 0.5in;
+    }
+
+    .contact-text {
+      white-space: pre-wrap;
+      margin-top: 6pt;
+    }
+
+    /* Strict Screenplay Baseline Grid & Metrics (18.0pt Line Pitch) */
+    .screenplay-block {
+      margin-top: 0;
+      margin-bottom: 0;
+      padding-top: 0;
+      padding-bottom: 0;
+      box-sizing: border-box;
+    }
+
+    .screenplay-line {
+      height: 18pt;
+      line-height: 18pt;
+      font-size: 12pt;
+      margin: 0;
+      padding: 0;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      box-sizing: border-box;
+    }
+
+    .slot-line {
+      height: 18pt;
+      line-height: 18pt;
+      font-size: 12pt;
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    .slot-blank-line {
+      height: 18pt;
+      line-height: 18pt;
+    }
+
+    .scene-heading {
+      margin-left: 0;
+      max-width: ${geometry.printableWidth};
+      text-transform: uppercase;
+      font-weight: bold;
+    }
+
+    .action {
+      margin-left: 0;
+      max-width: ${geometry.printableWidth};
+    }
+
+    .character {
+      margin-left: 2.2in;
+      text-transform: uppercase;
+      font-weight: bold;
+    }
+
+    .parenthetical {
+      margin-left: 1.6in;
+      max-width: 3.0in;
+    }
+
+    .dialogue {
+      margin-left: 1.0in;
+      max-width: 3.5in;
+    }
+
+    .transition {
+      margin-left: 4.5in;
+      text-transform: uppercase;
+    }
+
+    .shot {
+      margin-left: 0;
+      max-width: ${geometry.printableWidth};
+      text-transform: uppercase;
+      font-weight: bold;
+    }
+
+    .screenplay-more-continuation {
+      margin-left: 1.0in;
+      max-width: 3.5in;
+      text-align: center;
+      font-family: 'Courier Prime', 'Noto Sans Gurmukhi', monospace;
+    }
+
+    .screenplay-contd-continuation {
+      margin-left: 2.2in;
+      font-weight: bold;
+      text-transform: uppercase;
+      font-family: 'Courier Prime', 'Noto Sans Gurmukhi', monospace;
+    }
+
+    .character-highlight {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      display: inline;
+    }
+  </style>
+</head>
+<body>
+  ${titlePageHtml}
+  ${pagesHtml}
+</body>
+</html>`;
 }
 
 export interface CharacterSheetEntry {

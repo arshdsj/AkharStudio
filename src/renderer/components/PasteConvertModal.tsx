@@ -65,7 +65,9 @@ export const PasteConvertModal: React.FC<PasteConvertModalProps> = ({
     }
   }, [isOpen, initialText]);
 
-  if (!isOpen) return null;
+  const { mounted, scrimClassName } = useModalTransition(isOpen);
+
+  if (!mounted) return null;
 
   const handleConvert = () => {
     if (!inputText.trim()) {
@@ -105,10 +107,6 @@ export const PasteConvertModal: React.FC<PasteConvertModalProps> = ({
   const uncertainTokens = (conversionResult?.tokens || []).filter(
     (t) => t.isUncertain && t.suggestions.length > 1
   );
-
-  const { mounted, scrimClassName } = useModalTransition(isOpen);
-
-  if (!mounted) return null;
 
   return (
     <div className={scrimClassName} style={{ zIndex: 9999 }}>

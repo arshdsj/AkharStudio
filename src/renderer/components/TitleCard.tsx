@@ -166,7 +166,7 @@ export const TitleCard: React.FC<TitleCardProps> = ({
 
         {/* Full-Page Screenplay Paper representation */}
         <div
-          className={`screenplay-paper relative flex flex-col justify-between font-courier select-text ${
+          className={`screenplay-paper ds-page relative flex flex-col justify-between font-courier select-text ${
             paperSize === 'letter' ? 'paper-letter' : 'paper-a4'
           }`}
           style={{ minHeight: paperSize === 'letter' ? '11in' : '297mm' }}

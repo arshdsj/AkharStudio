@@ -1,6 +1,6 @@
 {
   "name": "akhar-studio",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "type": "module",
   "private": true,
   "description": "Desktop-first, local-first Punjabi screenplay editor",
@@ -19,8 +19,11 @@
     "start": "electron dist-electron/main.cjs",
     "test": "vitest run",
     "test:watch": "vitest",
-    "dist:win": "npm run build && electron-builder --win --publish never",
-    "dist:mac": "npm run build && electron-builder --mac --publish never"
+    "clean:builds": "node scripts/clean-outdated-builds.js",
+    "predist:mac": "node scripts/clean-outdated-builds.js",
+    "predist:win": "node scripts/clean-outdated-builds.js",
+    "dist:win": "node scripts/clean-outdated-builds.js && npm run build && electron-builder --win --publish never",
+    "dist:mac": "node scripts/clean-outdated-builds.js && npm run build && electron-builder --mac --publish never"
   },
   "build": {
     "appId": "com.akharstudio.app",

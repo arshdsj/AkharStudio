@@ -58,7 +58,9 @@ export const DiagnosticModal: React.FC<DiagnosticModalProps> = ({ isOpen, onClos
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
+  const { mounted, scrimClassName } = useModalTransition(isOpen);
+
+  if (!mounted) return null;
 
   const handleStartRecording = () => {
     const prefs = globalUserDict.getAllPreferences();
@@ -117,10 +119,6 @@ export const DiagnosticModal: React.FC<DiagnosticModalProps> = ({ isOpen, onClos
     setCopyFeedback(label);
     setTimeout(() => setCopyFeedback(null), 2000);
   };
-
-  const { mounted, scrimClassName } = useModalTransition(isOpen);
-
-  if (!mounted) return null;
 
   return (
     <div

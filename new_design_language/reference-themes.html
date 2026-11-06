@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design system reference — themes</title>
+<!-- Keep tokens.css and components.css in the same folder as this file. -->
+<script>(function(){try{var t=localStorage.getItem('scriptEditor.theme');document.documentElement.setAttribute('data-theme',(t==='darker'||t==='light')?t:'dark')}catch(e){document.documentElement.setAttribute('data-theme','dark')}})();</script>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="components.css">
+<link rel="stylesheet" href="themes.css">
+<style>
+  /* Reference-page layout only — not part of the design system */
+  body { margin: 0; background: var(--surface-canvas); min-height: 100vh; }
+  .stage { display: flex; gap: var(--space-8); padding: var(--space-8); align-items: stretch; height: 100vh; }
+  .stage { box-sizing: border-box; }
+  .stage .col > .ds-panel { flex: 1; }   /* panel fills the column on every tab */
+  .cap { color: var(--text-secondary); font-size: var(--text-xs); margin-bottom: var(--space-2); }
+  .col { display: flex; flex-direction: column; }
+  .scrim-demo { position: relative; }
+  .stage { flex-wrap: wrap; height: auto; min-height: 100vh; }
+  .stage .col > .ds-panel { min-height: 700px; }
+  .mock-page { width: 360px; min-height: 520px; padding: 40px 36px; background: var(--page-surface); color: var(--page-text);
+     font: 13px/1.6 var(--font-script); border-radius: var(--radius-sm); box-shadow: var(--shadow-thumb); }
+  .mock-page p { margin: 0 0 14px; } .mock-page .scene { font-weight: 700; text-transform: uppercase; }
+  .mock-page .char { margin-left: 140px; text-transform: uppercase; margin-bottom: 0; } .mock-page .dlg { margin-left: 90px; margin-right: 60px; }
+  .scrim-demo .ds-scrim { position: static; background: none; }
+</style>
+</head>
+<body class="ds-app">
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-chevron" viewBox="0 0 16 16"><path d="M6 3.5l4.5 4.5L6 12.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-close" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+    <symbol id="i-sidebar" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10 3v10" stroke="currentColor" stroke-width="1.5"/></symbol>
+    <symbol id="i-book" viewBox="0 0 16 16"><path d="M2 3.5h3.5A2.5 2.5 0 018 6v7a2 2 0 00-2-2H2zM14 3.5h-3.5A2.5 2.5 0 008 6v7a2 2 0 012-2h4z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></symbol>
+    <symbol id="i-keyboard" viewBox="0 0 16 16"><rect x="1.5" y="4" width="13" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M4 7h.01M6.5 7h.01M9 7h.01M11.5 7h.01M5 9.5h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 16 16"><path d="M2 4.5A1.5 1.5 0 013.5 3H6l1.5 1.5h5A1.5 1.5 0 0114 6v5.5a1.5 1.5 0 01-1.5 1.5h-9A1.5 1.5 0 012 11.5z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></symbol>
+    <symbol id="i-help" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M6.3 6.3a1.8 1.8 0 113 1.2c-.6.5-1.3.8-1.3 1.6M8 11.3h.01" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+    <symbol id="i-activity" viewBox="0 0 16 16"><path d="M1.5 8h3l2-5 3 10 2-5h3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+  </defs>
+</svg>
+
+<div class="stage">
+
+  <!-- One panel, two tabs. Width, header, tab bar and padding never change. -->
+  <div class="col">
+    <div class="cap">Side panel — both tabs share one shell</div>
+    <aside class="ds-panel" id="panel">
+      <header class="ds-panel__header">
+        <span>Panel</span>
+        <button class="ds-icon-btn" aria-label="Collapse panel"><svg><use href="#i-sidebar"/></svg></button>
+      </header>
+
+      <div class="ds-tabs" role="tablist">
+        <button class="ds-tab" role="tab" aria-selected="true"  data-tab="settings">Settings</button>
+        <button class="ds-tab" role="tab" aria-selected="false" data-tab="scenes">Scenes <span class="ds-tab__count">0</span></button>
+      </div>
+
+      <div class="ds-panel__body" id="tab-settings">
+        <section class="ds-section">
+          <h3 class="ds-section__title">Appearance</h3>
+          <div class="ds-seg" role="radiogroup" aria-label="Theme" data-theme-control>
+            <button class="ds-seg__item" role="radio" aria-checked="true" data-theme-value="dark">Dark</button>
+            <button class="ds-seg__item" role="radio" aria-checked="false" data-theme-value="darker">Darker</button>
+            <button class="ds-seg__item" role="radio" aria-checked="false" data-theme-value="light">Light</button>
+          </div>
+        </section>
+
+        <section class="ds-section">
+          <h3 class="ds-section__title">Language</h3>
+          <div class="ds-seg" role="radiogroup" aria-label="Language">
+            <button class="ds-seg__item gurmukhi" role="radio" aria-checked="true">ਪੰਜਾਬੀ</button>
+            <button class="ds-seg__item" role="radio" aria-checked="false">English</button>
+          </div>
+          <p class="ds-help">Phonetic transliteration: type in Roman letters, get Gurmukhi.</p>
+        </section>
+
+        <section class="ds-section">
+          <h3 class="ds-section__title">Document</h3>
+          <div class="ds-field">
+            <span class="ds-label">Paper format</span>
+            <div class="ds-seg" role="radiogroup" aria-label="Paper format">
+              <button class="ds-seg__item" role="radio" aria-checked="true">US Letter</button>
+              <button class="ds-seg__item" role="radio" aria-checked="false">A4</button>
+            </div>
+          </div>
+          <div class="ds-field">
+            <span class="ds-label">Dialogue continuation (CONT'D)</span>
+            <select class="ds-select"><option>Prompt when needed</option><option>Always</option><option>Never</option></select>
+          </div>
+        </section>
+
+        <section class="ds-section">
+          <h3 class="ds-section__title">Display</h3>
+          <div class="ds-field" style="gap:var(--space-1)">
+            <label class="ds-switch-row"><span class="ds-label">Show word count</span><input class="ds-switch" type="checkbox" role="switch" checked></label>
+            <p class="ds-help">Display screenplay word count in the bottom-right status bar.</p>
+          </div>
+          <div class="ds-field" style="gap:var(--space-1)">
+            <label class="ds-switch-row"><span class="ds-label">Highlight characters</span><input class="ds-switch" type="checkbox" role="switch"></label>
+            <p class="ds-help">Highlight dialogue cues, dialogue, and parentheticals.</p>
+          </div>
+          <div class="ds-list">
+            <button class="ds-row ds-row--two-line"><span class="ds-row__label">Character selection<span class="ds-row__sub">1 character selected</span></span><svg class="ds-row__chevron"><use href="#i-chevron"/></svg></button>
+          </div>
+        </section>
+
+        <section class="ds-section">
+          <h3 class="ds-section__title">Tools</h3>
+          <div class="ds-list">
+            <button class="ds-row"><svg class="ds-row__icon"><use href="#i-book"/></svg><span class="ds-row__label">Custom dictionary</span><svg class="ds-row__chevron"><use href="#i-chevron"/></svg></button>
+            <button class="ds-row"><svg class="ds-row__icon"><use href="#i-keyboard"/></svg><span class="ds-row__label">On-screen Gurmukhi keyboard</span><svg class="ds-row__chevron"><use href="#i-chevron"/></svg></button>
+            <button class="ds-row"><svg class="ds-row__icon"><use href="#i-folder"/></svg><span class="ds-row__label">Project library &amp; backups</span><svg class="ds-row__chevron"><use href="#i-chevron"/></svg></button>
+            <button class="ds-row"><svg class="ds-row__icon"><use href="#i-help"/></svg><span class="ds-row__label">Keyboard shortcuts &amp; help</span><svg class="ds-row__chevron"><use href="#i-chevron"/></svg></button>
+            <button class="ds-row"><svg class="ds-row__icon"><use href="#i-activity"/></svg><span class="ds-row__label">Diagnostics console</span><svg class="ds-row__chevron"><use href="#i-chevron"/></svg></button>
+          </div>
+        </section>
+      </div>
+
+      <div class="ds-panel__body" id="tab-scenes" hidden>
+        <div class="ds-empty">
+          <svg><use href="#i-list"/></svg>
+          <div class="ds-empty__title">No scenes yet</div>
+          <div class="ds-help">Start a line with INT. or EXT. to add a scene heading to the outline.</div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Dialog -->
+  <div class="col">
+    <div class="cap">Dialog — one surface, one primary action</div>
+    <div class="scrim-demo">
+      <div class="ds-scrim">
+        <div class="ds-dialog" role="dialog" aria-labelledby="dlg-title">
+          <div class="ds-dialog__header">
+            <span id="dlg-title">Export</span>
+            <button class="ds-icon-btn" aria-label="Close"><svg><use href="#i-close"/></svg></button>
+          </div>
+          <div class="ds-dialog__body">
+            <section class="ds-section">
+              <h3 class="ds-section__title">Screenplay PDF</h3>
+              <div class="ds-field">
+                <span class="ds-label">Paper size</span>
+                <div class="ds-seg" role="radiogroup" aria-label="Paper size">
+                  <button class="ds-seg__item" role="radio" aria-checked="true">US Letter · 8.5 × 11 in</button>
+                  <button class="ds-seg__item" role="radio" aria-checked="false">A4 · 210 × 297 mm</button>
+                </div>
+              </div>
+              <label class="ds-check"><input type="checkbox" checked><span class="ds-check__box"></span><span>Include title page</span></label>
+              <p class="ds-help">Set in Noto Sans Gurmukhi and Courier. Fonts are embedded, nothing to install.</p>
+            </section>
+            <section class="ds-section">
+              <h3 class="ds-section__title">Other formats</h3>
+              <div class="ds-list">
+                <button class="ds-row ds-row--two-line"><span class="ds-row__label">Plain text<span class="ds-row__sub">.txt formatted screenplay</span></span><svg class="ds-row__chevron"><use href="#i-chevron"/></svg></button>
+                <button class="ds-row ds-row--two-line"><span class="ds-row__label">Fountain<span class="ds-row__sub">.fountain with @ cues</span></span><svg class="ds-row__chevron"><use href="#i-chevron"/></svg></button>
+                <button class="ds-row ds-row--two-line"><span class="ds-row__label">Native project<span class="ds-row__sub">.scriptproject bundle</span></span><svg class="ds-row__chevron"><use href="#i-chevron"/></svg></button>
+              </div>
+            </section>
+          </div>
+          <div class="ds-dialog__footer">
+            <button class="ds-btn ds-btn--lg">Cancel</button>
+            <button class="ds-btn ds-btn--lg ds-btn--primary">Export PDF</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Writing page -->
+  <div class="col">
+    <div class="cap">Writing page — uses --page-surface / --page-text</div>
+    <div class="mock-page ds-page">
+      <p class="scene">INT. DHABA – NIGHT</p>
+      <p>Steam rises from a tin kettle. A TRUCK DRIVER sits alone, counting coins.</p>
+      <p class="char">Balwinder</p>
+      <p class="dlg gurmukhi" lang="pa">ਅੱਜ ਦੀ ਰਾਤ ਬਹੁਤ ਲੰਮੀ ਹੋਣ ਵਾਲੀ ਆ।</p>
+      <p class="char">Dhaba owner</p>
+      <p class="dlg">(without looking up) Then drink your tea while it's hot.</p>
+    </div>
+  </div>
+
+  <!-- Switch states -->
+  <div class="col">
+    <div class="cap">Switch — states</div>
+    <div class="ds-panel" style="flex:none;height:auto;width:240px">
+      <div class="ds-panel__body" style="gap:var(--space-2)">
+        <label class="ds-switch-row"><span class="ds-label">Off</span><input class="ds-switch" type="checkbox" role="switch"></label>
+        <label class="ds-switch-row"><span class="ds-label">On</span><input class="ds-switch" type="checkbox" role="switch" checked></label>
+        <label class="ds-switch-row"><span class="ds-label">Disabled off</span><input class="ds-switch" type="checkbox" role="switch" disabled></label>
+        <label class="ds-switch-row"><span class="ds-label">Disabled on</span><input class="ds-switch" type="checkbox" role="switch" checked disabled></label>
+        <label class="ds-switch-row"><span class="ds-label">Keyboard focus</span><input class="ds-switch" id="focus-demo" type="checkbox" role="switch" checked></label>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script src="theme.js"></script>
+<script>
+  // Reference behaviour only: tabs and segmented controls.
+  document.querySelectorAll('.ds-tab').forEach(t => t.addEventListener('click', () => {
+    document.querySelectorAll('.ds-tab').forEach(x => x.setAttribute('aria-selected', x === t));
+    document.querySelectorAll('.ds-panel__body').forEach(b => b.hidden = b.id !== 'tab-' + t.dataset.tab);
+  }));
+  document.querySelectorAll('.ds-seg').forEach(g => g.addEventListener('click', e => {
+    const i = e.target.closest('.ds-seg__item'); if (!i) return;
+    g.querySelectorAll('.ds-seg__item').forEach(x => x.setAttribute('aria-checked', x === i));
+  }));
+</script>
+</body>
+</html>

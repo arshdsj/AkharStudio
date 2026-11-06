@@ -1,0 +1,125 @@
+/* ==========================================================================
+   THEMES — additive override layer. Load AFTER tokens.css and components.css.
+
+   - DARK is the existing :root in tokens.css. It is the default and has NO
+     rules in this file, so it cannot change.
+   - DARKER and LIGHT only re-define semantic tokens (layer 2). Components,
+     spacing, type, radii, motion and layout are not touched.
+   - Selected with <html data-theme="dark|darker|light">. No attribute = dark.
+   - Selector :root[data-theme] out-ranks :root, so file order doesn't matter.
+   ========================================================================== */
+
+
+/* ---- Editor page tokens (new, additive) ----------------------------------
+   The writing page needs its own tokens because in Light mode it must be pure
+   white with black text, independent of the UI surfaces around it.
+
+   >>> FILL IN (the only values I could not see): copy the editor page's
+   >>> CURRENT dark-mode background and text colour into these two lines.
+   >>> Dark mode then stays exactly as it is today. */
+:root {
+  --page-surface-dark: #1e1e1e;   /* TODO: replace with the editor's current dark background */
+  --page-text-dark:    #ececec;   /* TODO: replace with the editor's current dark text colour */
+
+  --page-surface: var(--page-surface-dark);
+  --page-text:    var(--page-text-dark);
+}
+
+
+/* ==========================================================================
+   DARKER — same design, deeper values. Only darkness changes.
+   Each surface keeps its step relationship to the others (canvas < sunken <
+   chrome < panel < control < hover < pressed). Text, accent, lines, type,
+   spacing and components are inherited from Dark unchanged.
+   ========================================================================== */
+:root[data-theme="darker"] {
+  color-scheme: dark;
+
+  --surface-canvas:   #0a0a0a;
+  --surface-sunken:   #0d0d0d;
+  --surface-chrome:   #101010;
+  --surface-panel:    #151515;
+  --surface-control:  #1e1e1e;
+  --surface-hover:    #272727;
+  --surface-pressed:  #2f2f2f;
+  --surface-overlay:  #1b1b1b;
+  --surface-thumb:    #2f2f2f;
+  --surface-scrim:    rgba(0, 0, 0, .65);
+
+  /* Switch off-state follows the same darkening */
+  --switch-track-off:       #2f2f2f;
+  --switch-track-off-hover: #3a3a3a;
+
+  /* Editor page: the Dark page colour, deepened by the same proportion
+     (panel #232323 -> #151515 is about 60%) */
+  --page-surface: color-mix(in srgb, var(--page-surface-dark) 60%, #000);
+  --page-text:    var(--page-text-dark);
+
+  /* Shadows are invisible on near-black, so give them a touch more weight */
+  --shadow-overlay: 0 0 0 1px rgba(0,0,0,.6), 0 8px 24px rgba(0,0,0,.6), 0 24px 56px rgba(0,0,0,.5);
+}
+
+
+/* ==========================================================================
+   LIGHT — the same surface ladder, inverted. Hierarchy is still carried by
+   lightness steps, not borders. Accent blue is unchanged so the product
+   keeps one identity. Editor page is pure white with black text.
+
+   Back-to-front order (same as Dark, mirrored):
+     canvas (desk) < chrome < panel(lightest UI) ; controls are filled darker
+     than their panel ; overlays are white and lifted by shadow.
+   ========================================================================== */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  /* Surfaces */
+  --surface-canvas:   #d9d9d9;   /* the "desk" behind the white page */
+  --surface-sunken:   #dedede;   /* segmented-control track */
+  --surface-chrome:   #ebebeb;   /* top bar, status bar */
+  --surface-panel:    #f5f5f5;   /* side panels */
+  --surface-control:  #e6e6e6;   /* inputs, secondary buttons */
+  --surface-hover:    #dadada;
+  --surface-pressed:  #cfcfcf;
+  --surface-overlay:  #ffffff;   /* dialogs, menus */
+  --surface-scrim:    rgba(20, 20, 20, .38);
+  --surface-selected: rgba(51, 106, 219, .12);
+  --surface-thumb:    #ffffff;   /* active segment */
+
+  /* Text */
+  --text-primary:   #121212;
+  --text-secondary: #5a5a5a;
+  --text-disabled:  #8a8a8a;
+  --text-accent:    #2456b8;
+  --text-danger:    #c4352d;
+  /* --text-on-accent and the --accent-fill* tokens are inherited (white on blue) */
+
+  /* Lines and focus */
+  --line-separator: rgba(0, 0, 0, .10);
+  --line-edge:      rgba(255, 255, 255, .9);
+  --focus-ring:     #2b5bc4;
+
+  /* Elevation: in light mode depth comes from shadow, not from lighter fill */
+  --shadow-overlay: 0 0 0 1px rgba(0,0,0,.10), 0 8px 24px rgba(0,0,0,.16), 0 24px 56px rgba(0,0,0,.14);
+  --shadow-thumb:   0 1px 2px rgba(0,0,0,.22), 0 0 0 .5px rgba(0,0,0,.06);
+
+  /* Switch */
+  --switch-track-off:       #bdbdbd;
+  --switch-track-off-hover: #b0b0b0;
+  --switch-thumb-off:       #ffffff;
+  --switch-thumb-on:        #ffffff;
+
+  /* Writing page: pure white, pure black */
+  --page-surface: #ffffff;
+  --page-text:    #000000;
+}
+
+/* The two spots in components.css that used raw colours instead of tokens */
+:root[data-theme="light"] .ds-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%235a5a5a' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+}
+:root[data-theme="light"] .ds-panel__body { scrollbar-color: #c2c2c2 transparent; }
+:root[data-theme="darker"] .ds-panel__body { scrollbar-color: #2f2f2f transparent; }
+
+/* Gurmukhi/UI text on the white page must not inherit softened UI colours */
+:root[data-theme="light"] .ds-page,
+:root[data-theme="light"] .ds-page * { color: var(--page-text); }

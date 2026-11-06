@@ -1,16 +1,14 @@
 /**
- * WelcomeScreen.tsx - Launch Screen adhering strictly to the Script Editor Design System
- * (tokens.css, components.css, design-rules.md, reference.html)
+ * WelcomeScreen.tsx - Visually stunning, immersive Launch & Welcome Experience
+ * Adheres strictly to the Script Editor Design System (tokens.css, components.css, themes.css)
  *
- * Requirements:
- * - Rendered as a compact floating window (.ds-dialog) centered over .ds-scrim
- * - The actual application canvas is visible behind it through the scrim
- * - Prominent official brand logo (AkharStudio / ਅੱਖਰStudio) alternating per launch
- * - Top-right compact icon-only utility buttons: Export Database Backup, Restore Database Backup, Close
- * - Tooltips on hover, no permanently visible labels for utility buttons
+ * Enhancements:
+ * - Layered motion & entrance choreography with smooth spring-like bezier curves
+ * - Luminous ambient aura & backdrop glass styling
+ * - Ultra-responsive instant tooltips for backup & utility icons (no delayed native tooltips)
+ * - Hero branding with interactive script switching
  * - Exactly ONE instance of the primary action: "New Screenplay" (.ds-btn--primary in footer)
- * - Clean, uncluttered layout with primary focus on creating a new screenplay
- * - Visually distinguishes internal database projects from external files using design tokens
+ * - Clear distinction of internal database vs external files
  */
 
 import React, { useEffect, useRef } from 'react';
@@ -23,8 +21,10 @@ import {
   Download,
   ChevronRight,
   X,
+  Sparkles,
 } from 'lucide-react';
 import { AkharStudioLogo } from './AkharStudioLogo';
+import { Tooltip } from './Tooltip';
 import { RecentProject } from '../../types/screenplay';
 import { APP_VERSION, APP_AUTHOR } from '../../core/version';
 import { useModalTransition } from '../hooks/useModalTransition';
@@ -77,73 +77,100 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
           onDismiss();
         }
       }}
+      style={{
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
+      }}
     >
       <div
         ref={dialogRef}
-        className="ds-dialog max-h-[85vh] flex flex-col"
+        className="welcome-dialog-shell ds-dialog max-h-[88vh] flex flex-col relative"
         role="dialog"
         aria-labelledby="welcome-title"
+        style={{
+          width: '560px',
+        }}
       >
-        {/* Top bar with icon-only controls in the top-right corner */}
-        <div className="ds-dialog__header flex items-center justify-between">
-          <span
-            id="welcome-title"
-            className="text-xs uppercase tracking-wider font-mono font-medium"
-            style={{ color: 'var(--text-secondary)' }}
-          >
-            Welcome
-          </span>
+        {/* Ambient luminous glow effect (fluid motion) */}
+        <div className="welcome-aura" aria-hidden="true" />
 
-          {/* Top-Right Corner: Export DB, Restore DB, and Close */}
+        {/* Top Header Row with fast responsive tooltips */}
+        <div className="ds-dialog__header flex items-center justify-between relative z-10 welcome-anim-1">
+          <div className="flex items-center gap-2">
+            <Sparkles size={13} style={{ color: 'var(--text-accent)' }} className="opacity-80" />
+            <span
+              id="welcome-title"
+              className="text-xs uppercase tracking-wider font-mono font-medium"
+              style={{ color: 'var(--text-secondary)' }}
+            >
+              Welcome to Akhar Studio
+            </span>
+          </div>
+
+          {/* Top-Right Corner: Instant responsive tooltips for Export DB, Restore DB, and Close */}
           <div className="flex items-center gap-1">
             {onExportBackup && (
-              <button
-                type="button"
-                onClick={onExportBackup}
-                className="ds-icon-btn"
-                title="Export Database Backup..."
-                aria-label="Export Database Backup"
-              >
-                <Download size={16} />
-              </button>
+              <Tooltip content="Export Database Backup..." position="bottom" delay={30}>
+                <button
+                  type="button"
+                  onClick={onExportBackup}
+                  className="ds-icon-btn transition-transform active:scale-95"
+                  aria-label="Export Database Backup"
+                >
+                  <Download size={15} />
+                </button>
+              </Tooltip>
             )}
 
-            <button
-              type="button"
-              onClick={onRestoreBackup}
-              className="ds-icon-btn"
-              title="Restore Database Backup..."
-              aria-label="Restore Database Backup"
-            >
-              <ArchiveRestore size={16} />
-            </button>
-
-            {canDismiss && (
+            <Tooltip content="Restore Database Backup..." position="bottom" delay={30}>
               <button
                 type="button"
-                onClick={onDismiss}
-                className="ds-icon-btn"
-                title="Close (Escape)"
-                aria-label="Close"
+                onClick={onRestoreBackup}
+                className="ds-icon-btn transition-transform active:scale-95"
+                aria-label="Restore Database Backup"
               >
-                <X size={16} />
+                <ArchiveRestore size={15} />
               </button>
+            </Tooltip>
+
+            {canDismiss && (
+              <Tooltip content="Close (Escape)" position="bottom" delay={30}>
+                <button
+                  type="button"
+                  onClick={onDismiss}
+                  className="ds-icon-btn transition-transform active:scale-95"
+                  aria-label="Close"
+                >
+                  <X size={15} />
+                </button>
+              </Tooltip>
             )}
           </div>
         </div>
 
-        {/* Dialog Body */}
-        <div className="ds-dialog__body overflow-y-auto">
-          {/* Prominent Hero Logo Section */}
-          <div className="flex flex-col items-center text-center pt-2 pb-1">
-            <AkharStudioLogo mode={logoMode} size="xl" className="justify-center" />
+        {/* Dialog Body with layered staggered animations */}
+        <div className="ds-dialog__body overflow-y-auto relative z-10 space-y-5 py-4">
+          {/* Prominent Hero Branding Section */}
+          <div className="flex flex-col items-center text-center pt-2 pb-2 welcome-anim-2">
+            <div className="p-2 rounded-2xl transition-transform hover:scale-[1.02] duration-300">
+              <AkharStudioLogo mode={logoMode} size="xl" className="justify-center" />
+            </div>
+
             <p
-              className="ds-help mt-3 text-center max-w-sm"
+              className="ds-help mt-3 text-center max-w-md text-sm leading-relaxed"
               style={{ color: 'var(--text-secondary)' }}
             >
               Desktop-first Punjabi screenplay editor with instant local persistence and offline transliteration.
             </p>
-            <div className="mt-2 flex items-center gap-2 text-[11px] font-mono" style={{ color: 'var(--text-disabled)' }}>
+
+            <div
+              className="mt-2.5 inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full text-[11px] font-mono border"
+              style={{
+                background: 'var(--surface-sunken)',
+                borderColor: 'var(--line-separator)',
+                color: 'var(--text-disabled)',
+              }}
+            >
               <span>Version {APP_VERSION}</span>
               <span>·</span>
               <span>Created By {APP_AUTHOR}</span>
@@ -151,22 +178,48 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
           </div>
 
           {/* Recent Screenplays Section */}
-          <section className="ds-section">
-            <div className="flex items-center justify-between">
-              <h3 className="ds-section__title">Recent Screenplays</h3>
-              <span className="ds-help font-mono">
+          <section className="ds-section welcome-anim-3">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="ds-section__title text-xs uppercase tracking-wider font-semibold" style={{ color: 'var(--text-secondary)' }}>
+                Recent Screenplays
+              </h3>
+              <span
+                className="font-mono text-xs px-2 py-0.5 rounded"
+                style={{
+                  background: 'var(--surface-sunken)',
+                  color: 'var(--text-secondary)',
+                }}
+              >
                 {recentProjects.length} {recentProjects.length === 1 ? 'project' : 'projects'}
               </span>
             </div>
 
             {recentProjects.length === 0 ? (
-              <div className="ds-empty">
-                <FileText size={24} />
-                <div className="ds-empty__title">No screenplays yet</div>
-                <div className="ds-help">Click "New Screenplay" below to start writing.</div>
+              <div
+                className="ds-empty rounded-lg p-6 border border-dashed flex flex-col items-center justify-center text-center"
+                style={{
+                  borderColor: 'var(--line-separator)',
+                  background: 'var(--surface-sunken)',
+                }}
+              >
+                <FileText size={26} className="opacity-40 mb-2" style={{ color: 'var(--text-secondary)' }} />
+                <div className="ds-empty__title font-medium text-sm" style={{ color: 'var(--text-primary)' }}>
+                  No screenplays yet
+                </div>
+                <div className="ds-help text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
+                  Click &ldquo;New Screenplay&rdquo; below to start writing.
+                </div>
               </div>
             ) : (
-              <div className="ds-list" style={{ maxHeight: '240px', overflowY: 'auto' }}>
+              <div
+                className="ds-list rounded-lg overflow-hidden border"
+                style={{
+                  maxHeight: '230px',
+                  overflowY: 'auto',
+                  borderColor: 'var(--line-separator)',
+                  background: 'var(--surface-sunken)',
+                }}
+              >
                 {recentProjects.map((rec) => {
                   const isDb = rec.source === 'database' || !rec.filePath;
                   return (
@@ -174,21 +227,38 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                       key={rec.id + (rec.filePath || '')}
                       type="button"
                       onClick={() => onOpenRecent(rec)}
-                      className="ds-row ds-row--two-line"
+                      className="ds-row ds-row--two-line w-full text-left transition-colors group px-3 py-2 border-b last:border-b-0"
+                      style={{
+                        borderColor: 'var(--line-separator)',
+                      }}
                     >
                       {isDb ? (
-                        <Database className="ds-row__icon" size={16} />
+                        <Database
+                          className="ds-row__icon shrink-0 group-hover:scale-110 transition-transform"
+                          size={16}
+                          style={{ color: 'var(--text-accent)' }}
+                        />
                       ) : (
-                        <FileText className="ds-row__icon" size={16} />
+                        <FileText
+                          className="ds-row__icon shrink-0 group-hover:scale-110 transition-transform"
+                          size={16}
+                          style={{ color: 'var(--text-secondary)' }}
+                        />
                       )}
 
-                      <span className="ds-row__label">
+                      <span className="ds-row__label flex-1 min-w-0">
                         <span className="flex items-center gap-2">
-                          <span className="truncate">{rec.title || 'Untitled Screenplay'}</span>
-                          {/* Visual Distinction Tag (Requirement 7) */}
+                          <span
+                            className="truncate font-medium text-sm group-hover:text-[var(--text-accent)] transition-colors"
+                            style={{ color: 'var(--text-primary)' }}
+                          >
+                            {rec.title || 'Untitled Screenplay'}
+                          </span>
+
+                          {/* Visual Distinction Tag */}
                           {isDb ? (
                             <span
-                              className="px-1.5 py-0.5 text-[10px] font-medium rounded shrink-0"
+                              className="px-1.5 py-0.5 text-[10px] font-semibold rounded shrink-0"
                               style={{
                                 background: 'var(--surface-selected)',
                                 color: 'var(--text-accent)',
@@ -208,19 +278,24 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                             </span>
                           )}
                         </span>
-                        <span className="ds-row__sub font-mono truncate">
+
+                        <span className="ds-row__sub font-mono truncate text-xs" style={{ color: 'var(--text-secondary)' }}>
                           {isDb
                             ? `${rec.pageCount || 1} pages${rec.wordCount !== undefined ? ` · ${rec.wordCount} words` : ''}`
                             : rec.filePath}
                         </span>
                       </span>
 
-                      <span className="ds-row__meta font-mono shrink-0">
+                      <span className="ds-row__meta font-mono shrink-0 text-xs text-right mr-1" style={{ color: 'var(--text-disabled)' }}>
                         {rec.modifiedAt
                           ? new Date(rec.modifiedAt).toLocaleDateString()
                           : ''}
                       </span>
-                      <ChevronRight className="ds-row__chevron" size={16} />
+                      <ChevronRight
+                        className="ds-row__chevron shrink-0 group-hover:translate-x-0.5 transition-transform"
+                        size={15}
+                        style={{ color: 'var(--text-disabled)' }}
+                      />
                     </button>
                   );
                 })}
@@ -229,13 +304,13 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
           </section>
         </div>
 
-        {/* Footer: Single primary focus on New Screenplay, with Open File on the left */}
-        <div className="ds-dialog__footer flex items-center justify-between">
+        {/* Footer: Exactly ONE instance of the primary action (New Screenplay) */}
+        <div className="ds-dialog__footer flex items-center justify-between relative z-10 welcome-anim-4">
           <button
             type="button"
             onClick={onOpenExternalFile}
-            className="ds-btn ds-btn--lg flex items-center gap-2"
-            title="Open an existing external screenplay (.scriptproject, .json)"
+            className="ds-btn ds-btn--lg flex items-center gap-2 transition-transform active:scale-98"
+            aria-label="Open File"
           >
             <FolderOpen size={16} />
             <span>Open File...</span>
@@ -254,8 +329,9 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
             <button
               type="button"
               onClick={onNewDatabaseProject}
-              className="ds-btn ds-btn--lg ds-btn--primary flex items-center gap-2"
+              className="ds-btn ds-btn--lg ds-btn--primary flex items-center gap-2 shadow-md transition-transform active:scale-98"
               autoFocus
+              aria-label="New Screenplay"
             >
               <FilePlus size={16} />
               <span>New Screenplay</span>

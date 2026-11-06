@@ -22,6 +22,7 @@ export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({
   nextVersionNumber,
   activeVersionName,
 }) => {
+  const { mounted, scrimClassName } = useModalTransition(isOpen);
   const [customName, setCustomName] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -34,7 +35,7 @@ export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({
     }
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  if (!mounted) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,10 +48,6 @@ export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({
       ? customName.trim()
       : `Version ${nextVersionNumber} — ${customName.trim()}`
     : `Version ${nextVersionNumber}`;
-
-  const { mounted, scrimClassName } = useModalTransition(isOpen);
-
-  if (!mounted) return null;
 
   return (
     <div className={scrimClassName} style={{ zIndex: 9999 }}>

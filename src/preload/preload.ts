@@ -55,6 +55,7 @@ export interface ElectronAPI {
     customDraft?: ScriptDraft;
     password?: string;
     preserveCharacterHighlights?: boolean;
+    useUnifiedPagination?: boolean;
   }) => Promise<ExportResult>;
   exportTextFile: (defaultTitle: string, content: string) => Promise<ExportResult>;
   exportFountainFile: (defaultTitle: string, content: string) => Promise<ExportResult>;

@@ -86,7 +86,9 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
+  const { mounted, scrimClassName } = useModalTransition(isOpen);
+
+  if (!mounted) return null;
 
   // Validation for selected pages
   const isPageRangeValid = fromPage >= 1 && toPage <= totalPages && fromPage <= toPage;
@@ -127,10 +129,6 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   } else if (exportArea === 'highlighted_text') {
     canExport = canExport && hasSelectedText;
   }
-
-  const { mounted, scrimClassName } = useModalTransition(isOpen);
-
-  if (!mounted) return null;
 
   return (
     <div

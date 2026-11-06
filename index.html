@@ -1,10 +1,32 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/png" href="/icon.png" />
     <title>AkharStudio — Punjabi Screenplay & Writing Studio</title>
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('scriptEditor.theme');
+          var active = (t === 'darker' || t === 'light') ? t : 'dark';
+          document.documentElement.setAttribute('data-theme', active);
+          if (active === 'light') {
+            document.documentElement.classList.remove('dark', 'darker');
+            document.documentElement.classList.add('light');
+          } else if (active === 'darker') {
+            document.documentElement.classList.remove('light');
+            document.documentElement.classList.add('dark', 'darker');
+          } else {
+            document.documentElement.classList.remove('light', 'darker');
+            document.documentElement.classList.add('dark');
+          }
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
     <style>
       @font-face {
         font-family: 'Noto Sans Gurmukhi';
@@ -22,8 +44,8 @@
       body {
         margin: 0;
         padding: 0;
-        background-color: #161616;
-        color: #ececec;
+        background-color: var(--surface-canvas, #161616);
+        color: var(--text-primary, #ececec);
         overflow: hidden;
         user-select: none;
       }

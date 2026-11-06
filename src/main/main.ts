@@ -11,6 +11,7 @@ import { DatabaseManager } from './database/DatabaseManager';
 import { ScriptProject, PaperSize, ScriptDraft, SessionRecoveryCheckpoint } from '../types/screenplay';
 import { getActiveDraft } from '../core/model/ProjectModel';
 import { generateScreenplayHtml, generateCharacterSheetHtml } from '../core/export/pdfExporter';
+import { validateFontBuffer, EXPECTED_NOTO_SANS_GURMUKHI } from '../core/layout/fontMetrics';
 import { exportProjectBundle } from '../core/storage/projectBundle';
 import { APP_VERSION, APP_AUTHOR, APP_FULL_NAME } from '../core/version';
 
@@ -19,6 +20,8 @@ app.setName('AkharStudio');
 
 let mainWindow: BrowserWindow | null = null;
 let isQuitting = false;
+let closeRequested = false;
+let closeRequestTimer: NodeJS.Timeout | null = null;
 let sessionInterruptedOnLaunch = false;
 let startupRecoveryCheckpoint: SessionRecoveryCheckpoint | null = null;
 
@@ -56,8 +59,18 @@ function createWindow() {
 
   mainWindow.on('close', (e) => {
     if (!isQuitting) {
+      if (closeRequested || !mainWindow?.webContents || mainWindow.webContents.isCrashed()) {
+        isQuitting = true;
+        return;
+      }
       e.preventDefault();
+      closeRequested = true;
       mainWindow?.webContents.send('app:request-close');
+
+      if (closeRequestTimer) clearTimeout(closeRequestTimer);
+      closeRequestTimer = setTimeout(() => {
+        closeRequested = false;
+      }, 4000);
     }
   });
 
@@ -425,6 +438,7 @@ ipcMain.handle(
       customDraft?: ScriptDraft;
       password?: string;
       preserveCharacterHighlights?: boolean;
+      useUnifiedPagination?: boolean;
     }
   ) => {
     if (!mainWindow) return { canceled: true };
@@ -463,6 +477,20 @@ ipcMain.handle(
     const courierFontBase64 = getEmbeddedFontBase64('CourierPrime.ttf');
     const gurmukhiFontBase64 = getEmbeddedFontBase64('NotoSansGurmukhi.ttf');
 
+    const useUnified =
+      typeof options.useUnifiedPagination === 'boolean'
+        ? options.useUnifiedPagination
+        : process.env.AKHAR_USE_UNIFIED_PAGINATION === '1';
+
+    // If unified export is requested, validate Gurmukhi font buffer before rendering
+    if (useUnified && gurmukhiFontBase64) {
+      const fontBuf = Buffer.from(gurmukhiFontBase64, 'base64');
+      const valRes = await validateFontBuffer(fontBuf.buffer, EXPECTED_NOTO_SANS_GURMUKHI);
+      if (!valRes.valid) {
+        throw new Error(`Gurmukhi font validation failed: ${valRes.error || valRes.mismatches?.join('; ')}`);
+      }
+    }
+
     // 4. Generate clean self-contained HTML
     let html = '';
     if (exportArea === 'character_sheet') {
@@ -481,6 +509,8 @@ ipcMain.handle(
         gurmukhiFontBase64,
         highlightCharacters: snapshotProject.settings?.highlightCharacters,
         preserveCharacterHighlights: options.preserveCharacterHighlights,
+        useUnifiedPagination: useUnified,
+        contdSetting: snapshotProject.settings?.contdSetting || 'on',
       });
     }
 
@@ -497,6 +527,18 @@ ipcMain.handle(
 
     try {
       await printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+
+      // Verify font readiness in print renderer when unified export is requested
+      if (useUnified && gurmukhiFontBase64) {
+        const fontReady = await printWindow.webContents.executeJavaScript(`
+          document.fonts.ready.then(() => {
+            return document.fonts.check('12pt "Noto Sans Gurmukhi"');
+          })
+        `);
+        if (!fontReady) {
+          throw new Error('Gurmukhi font validation failed: "Noto Sans Gurmukhi" did not become available in PDF print renderer');
+        }
+      }
 
       const printOptions: Electron.PrintToPDFOptions = {
         pageSize: options.paperSize === 'a4' ? 'A4' : 'Letter',
@@ -666,13 +708,19 @@ app.whenReady().then(async () => {
 
 app.on('before-quit', (e) => {
   if (!isQuitting) {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      e.preventDefault();
-      mainWindow.webContents.send('app:request-close');
-    } else {
+    if (closeRequested || !mainWindow || mainWindow.isDestroyed() || mainWindow.webContents?.isCrashed()) {
       isQuitting = true;
       dbManager.setCleanShutdown(true);
+      return;
     }
+    e.preventDefault();
+    closeRequested = true;
+    mainWindow.webContents.send('app:request-close');
+
+    if (closeRequestTimer) clearTimeout(closeRequestTimer);
+    closeRequestTimer = setTimeout(() => {
+      closeRequested = false;
+    }, 4000);
   }
 });
 

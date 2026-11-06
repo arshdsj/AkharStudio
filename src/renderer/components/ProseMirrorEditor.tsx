@@ -40,6 +40,14 @@ import {
   clearSearch,
   SearchState,
 } from '../../core/editor/searchPlugin';
+import {
+  createPaginationPlugin,
+  paginationPluginKey,
+} from '../../core/editor/paginationPlugin';
+import {
+  createUnifiedPaginationPlugin,
+  unifiedPaginationPluginKey,
+} from '../../core/editor/unifiedPaginationPlugin';
 import { KeyOutput } from '../../core/editor/gurmukhiKeyboardMappings';
 import { SuggestionPopup } from './SuggestionPopup';
 import { TransliterationPopup } from './TransliterationPopup';
@@ -50,6 +58,7 @@ import {
   ScreenplayBlockType,
   ContdSetting,
   HighlightCharactersSetting,
+  PaperSize,
 } from '../../types/screenplay';
 
 interface ContextMenuState {
@@ -93,6 +102,12 @@ export interface ProseMirrorEditorHandle {
   setBlockComment: (comment: string) => void;
 }
 
+export interface PaginationEngineStatus {
+  engine: 'legacy' | 'unified';
+  isFallback: boolean;
+  fallbackReason?: string;
+}
+
 interface ProseMirrorEditorProps {
   draft: ScriptDraft;
   onDraftChange: (updatedDraft: ScriptDraft, options?: { isLineCompleted?: boolean }) => void;
@@ -105,9 +120,14 @@ interface ProseMirrorEditorProps {
   onTriggerContdPrompt: (characterName: string) => void;
   onActiveBlockChange: (block: ScreenplayBlock | null) => void;
   highlightCharacters?: HighlightCharactersSetting;
+  paperSize?: PaperSize;
   isModalOpen?: boolean;
   onSearchStateChange?: (state: SearchState) => void;
   onDetectRomanPunjabiPaste?: (text: string) => void;
+  useUnifiedPagination?: boolean;
+  onPaginationEngineStatusChange?: (status: PaginationEngineStatus) => void;
+  initialSelection?: { from: number; to: number } | null;
+  onSelectionChange?: (sel: { from: number; to: number }) => void;
 }
 
 export const ProseMirrorEditor = React.forwardRef<ProseMirrorEditorHandle, ProseMirrorEditorProps>(
@@ -124,9 +144,14 @@ export const ProseMirrorEditor = React.forwardRef<ProseMirrorEditorHandle, Prose
       onTriggerContdPrompt,
       onActiveBlockChange,
       highlightCharacters,
+      paperSize = 'letter',
       isModalOpen = false,
       onSearchStateChange,
       onDetectRomanPunjabiPaste,
+      useUnifiedPagination = false,
+      onPaginationEngineStatusChange,
+      initialSelection = null,
+      onSelectionChange,
     },
     ref
   ) => {
@@ -137,8 +162,14 @@ export const ProseMirrorEditor = React.forwardRef<ProseMirrorEditorHandle, Prose
     const draftRef = useRef(draft);
     draftRef.current = draft;
 
+    const onSelectionChangeRef = useRef(onSelectionChange);
+    onSelectionChangeRef.current = onSelectionChange;
+
     const onDraftChangeRef = useRef(onDraftChange);
     onDraftChangeRef.current = onDraftChange;
+
+    const onPaginationEngineStatusChangeRef = useRef(onPaginationEngineStatusChange);
+    onPaginationEngineStatusChangeRef.current = onPaginationEngineStatusChange;
 
     const inputModeRef = useRef(inputMode);
     inputModeRef.current = inputMode;
@@ -506,11 +537,103 @@ export const ProseMirrorEditor = React.forwardRef<ProseMirrorEditorHandle, Prose
     const highlightSettingRef = useRef(highlightCharacters);
     highlightSettingRef.current = highlightCharacters;
 
+    // Stable references to editor plugins so undo/redo history and editor extensions
+    // are strictly preserved across pagination mode, paper size, and cont'd setting switches
+    const historyPluginRef = useRef<Plugin | null>(null);
+    if (!historyPluginRef.current) {
+      historyPluginRef.current = history();
+    }
+    const translitPluginRef = useRef<Plugin | null>(null);
+    const vkPluginRef = useRef<Plugin | null>(null);
+    const characterHighlightPluginRef = useRef<Plugin | null>(null);
+    const searchPluginRef = useRef<Plugin | null>(null);
+    const keymapPluginRef = useRef<Plugin | null>(null);
+
+    const buildPaginationPlugin = useCallback(
+      (unified: boolean, paper: PaperSize, contd: ContdSetting): Plugin => {
+        if (unified) {
+          onPaginationEngineStatusChangeRef.current?.({
+            engine: 'unified',
+            isFallback: false,
+          });
+          try {
+            return createUnifiedPaginationPlugin({
+              paperSize: paper,
+              contdSetting: contd,
+              onFallback: (reason) => {
+                onPaginationEngineStatusChangeRef.current?.({
+                  engine: 'unified',
+                  isFallback: true,
+                  fallbackReason: reason,
+                });
+              },
+            });
+          } catch (err) {
+            console.error(
+              '[ProseMirrorEditor] Failed to construct unified pagination plugin, falling back to legacy plugin:',
+              err
+            );
+            onPaginationEngineStatusChangeRef.current?.({
+              engine: 'unified',
+              isFallback: true,
+              fallbackReason: 'layout_crash',
+            });
+            return createPaginationPlugin({ paperSize: paper });
+          }
+        } else {
+          onPaginationEngineStatusChangeRef.current?.({
+            engine: 'legacy',
+            isFallback: false,
+          });
+          return createPaginationPlugin({ paperSize: paper });
+        }
+      },
+      []
+    );
+
     useEffect(() => {
       if (viewRef.current) {
         viewRef.current.dispatch(viewRef.current.state.tr.setMeta('characterHighlightUpdated', true));
       }
     }, [highlightCharacters]);
+
+    const prevModeRef = useRef(useUnifiedPagination);
+    const isInitialMountRef = useRef(true);
+    useEffect(() => {
+      if (isInitialMountRef.current) {
+        isInitialMountRef.current = false;
+        return;
+      }
+      const view = viewRef.current;
+      if (!view) return;
+
+      if (prevModeRef.current !== useUnifiedPagination) {
+        prevModeRef.current = useUnifiedPagination;
+        const paginationPlugin = buildPaginationPlugin(useUnifiedPagination, paperSize, contdSetting);
+        const newPlugins = [
+          historyPluginRef.current!,
+          translitPluginRef.current!,
+          vkPluginRef.current!,
+          characterHighlightPluginRef.current!,
+          paginationPlugin,
+          searchPluginRef.current!,
+          keymapPluginRef.current!,
+        ];
+
+        const reconfiguredState = view.state.reconfigure({ plugins: newPlugins });
+        view.updateState(reconfiguredState);
+      } else {
+        if (useUnifiedPagination) {
+          view.dispatch(
+            view.state.tr.setMeta(unifiedPaginationPluginKey, { paperSize, contdSetting })
+          );
+        } else {
+          view.dispatch(
+            view.state.tr.setMeta(paginationPluginKey, { paperSize })
+          );
+        }
+      }
+    }, [paperSize, contdSetting, useUnifiedPagination, buildPaginationPlugin]);
 
     // Dismiss transliteration popup if switched to English mode or Virtual Keyboard is active
     useEffect(() => {
@@ -572,56 +695,73 @@ export const ProseMirrorEditor = React.forwardRef<ProseMirrorEditorHandle, Prose
       if (!editorMountRef.current) return;
 
       const initialDoc = draftToProseMirrorDoc(draftRef.current);
-      const translitPlugin = createTransliterationPlugin(
-        defaultTransliterator,
-        (newState) => {
-          setTranslitState(newState);
-        },
-        () => inputModeRef.current,
-        undefined,
-        () => isVirtualKeyboardOpenRef.current
-      );
+      if (!translitPluginRef.current) {
+        translitPluginRef.current = createTransliterationPlugin(
+          defaultTransliterator,
+          (newState) => {
+            setTranslitState(newState);
+          },
+          () => inputModeRef.current,
+          undefined,
+          () => isVirtualKeyboardOpenRef.current
+        );
+      }
 
-      const vkPlugin = createVirtualKeyboardPlugin({
-        isVirtualKeyboardActive: () => isVirtualKeyboardOpenRef.current,
-        onShiftChange: (isShift) => {
-          onShiftChangeRef.current?.(isShift);
-        },
-        onAltOrCtrlChange: (isAltOrCtrl) => {
-          onAltOrCtrlChangeRef.current?.(isAltOrCtrl);
-        },
-        onDeactivate: () => {
-          onToggleVirtualKeyboardRef.current?.();
-        },
-      });
+      if (!vkPluginRef.current) {
+        vkPluginRef.current = createVirtualKeyboardPlugin({
+          isVirtualKeyboardActive: () => isVirtualKeyboardOpenRef.current,
+          onShiftChange: (isShift) => {
+            onShiftChangeRef.current?.(isShift);
+          },
+          onAltOrCtrlChange: (isAltOrCtrl) => {
+            onAltOrCtrlChangeRef.current?.(isAltOrCtrl);
+          },
+          onDeactivate: () => {
+            onToggleVirtualKeyboardRef.current?.();
+          },
+        });
+      }
 
       // Presentation-layer character highlight plugin (Requirement 5)
-      const characterHighlightPlugin = new Plugin({
-        key: new PluginKey('characterHighlightPlugin'),
-        props: {
-          decorations(state) {
-            const cfg = highlightSettingRef.current;
-            if (!cfg || !cfg.enabled || !cfg.selectedCharacters || cfg.selectedCharacters.length === 0) {
-              return DecorationSet.empty;
-            }
+      if (!characterHighlightPluginRef.current) {
+        characterHighlightPluginRef.current = new Plugin({
+          key: new PluginKey('characterHighlightPlugin'),
+          props: {
+            decorations(state) {
+              const cfg = highlightSettingRef.current;
+              if (!cfg || !cfg.enabled || !cfg.selectedCharacters || cfg.selectedCharacters.length === 0) {
+                return DecorationSet.empty;
+              }
 
-            const selectedSet = new Set(cfg.selectedCharacters.map((c) => c.toUpperCase().trim()));
-            const color = cfg.color || 'rgba(167, 139, 250, 0.35)';
-            const decos: Decoration[] = [];
-            let currentSpeaker: string | null = null;
+              const selectedSet = new Set(cfg.selectedCharacters.map((c) => c.toUpperCase().trim()));
+              const color = cfg.color || 'rgba(167, 139, 250, 0.35)';
+              const decos: Decoration[] = [];
+              let currentSpeaker: string | null = null;
 
-            state.doc.forEach((node, offset) => {
-              if (node.type.name !== 'screenplay_block') return;
+              state.doc.forEach((node, offset) => {
+                if (node.type.name !== 'screenplay_block') return;
 
-              const type = node.attrs.type as ScreenplayBlockType;
-              const text = node.textContent.trim();
+                const type = node.attrs.type as ScreenplayBlockType;
+                const text = node.textContent.trim();
 
-              if (type === 'scene_heading') {
-                currentSpeaker = null;
-              } else if (type === 'character') {
-                const charName = normalizeCharacterName(text);
-                if (charName && selectedSet.has(charName)) {
-                  currentSpeaker = charName;
+                if (type === 'scene_heading') {
+                  currentSpeaker = null;
+                } else if (type === 'character') {
+                  const charName = normalizeCharacterName(text);
+                  if (charName && selectedSet.has(charName)) {
+                    currentSpeaker = charName;
+                    if (node.content.size > 0) {
+                      decos.push(
+                        Decoration.inline(offset + 1, offset + 1 + node.content.size, {
+                          class: 'character-highlight-text',
+                          style: `background-color: ${color}; border-radius: 3px; padding: 2px 4px; box-decoration-break: clone; -webkit-box-decoration-break: clone;`,
+                        })
+                      );
+                    }
+                  } else {
+                    currentSpeaker = null;
+                  }
+                } else if (currentSpeaker && (type === 'dialogue' || type === 'parenthetical')) {
                   if (node.content.size > 0) {
                     decos.push(
                       Decoration.inline(offset + 1, offset + 1 + node.content.size, {
@@ -630,50 +770,60 @@ export const ProseMirrorEditor = React.forwardRef<ProseMirrorEditorHandle, Prose
                       })
                     );
                   }
-                } else {
+                } else if (type === 'action' || type === 'transition' || type === 'shot') {
                   currentSpeaker = null;
                 }
-              } else if (currentSpeaker && (type === 'dialogue' || type === 'parenthetical')) {
-                if (node.content.size > 0) {
-                  decos.push(
-                    Decoration.inline(offset + 1, offset + 1 + node.content.size, {
-                      class: 'character-highlight-text',
-                      style: `background-color: ${color}; border-radius: 3px; padding: 2px 4px; box-decoration-break: clone; -webkit-box-decoration-break: clone;`,
-                    })
-                  );
-                }
-              } else if (type === 'action' || type === 'transition' || type === 'shot') {
-                currentSpeaker = null;
-              }
-            });
+              });
 
-            return DecorationSet.create(state.doc, decos);
+              return DecorationSet.create(state.doc, decos);
+            },
           },
-        },
-      });
+        });
+      }
 
-      const searchPlugin = createSearchPlugin((s) => {
-        onSearchStateChangeRef.current?.(s);
-      });
+      if (!searchPluginRef.current) {
+        searchPluginRef.current = createSearchPlugin((s) => {
+          onSearchStateChangeRef.current?.(s);
+        });
+      }
 
-      const state = EditorState.create({
+      if (!keymapPluginRef.current) {
+        keymapPluginRef.current = createScreenplayKeymap();
+      }
+
+      const paginationPlugin = buildPaginationPlugin(useUnifiedPagination, paperSize, contdSetting);
+
+      let state = EditorState.create({
         doc: initialDoc,
         schema: screenplaySchema,
         plugins: [
-          history(),
-          translitPlugin,
-          vkPlugin,
-          characterHighlightPlugin,
-          searchPlugin,
-          createScreenplayKeymap(),
+          historyPluginRef.current!,
+          translitPluginRef.current!,
+          vkPluginRef.current!,
+          characterHighlightPluginRef.current!,
+          paginationPlugin,
+          searchPluginRef.current!,
+          keymapPluginRef.current!,
         ],
       });
+
+      if (initialSelection && initialSelection.from >= 0 && initialSelection.from <= initialDoc.content.size) {
+        try {
+          const resolvedFrom = Math.min(Math.max(1, initialSelection.from), initialDoc.content.size);
+          const sel = Selection.near(state.doc.resolve(resolvedFrom));
+          state = state.apply(state.tr.setSelection(sel));
+        } catch {
+          // ignore if position resolution fails
+        }
+      }
 
       const view = new EditorView(editorMountRef.current, {
         state,
         dispatchTransaction(tr: Transaction) {
           const newState = view.state.apply(tr);
           view.updateState(newState);
+
+          onSelectionChangeRef.current?.({ from: newState.selection.from, to: newState.selection.to });
 
           if (tr.docChanged) {
             const updatedDraft = proseMirrorDocToDraft(newState.doc, draftRef.current);
@@ -735,7 +885,7 @@ export const ProseMirrorEditor = React.forwardRef<ProseMirrorEditorHandle, Prose
 
           // Screenplay element autocomplete (suppressed while transliterating or when modal is open)
           const isTransliterating =
-            translitPlugin.getState(newState)?.isActive || false;
+            translitPluginRef.current?.getState(newState)?.isActive || false;
           if (!isTransliterating && !isModalOpenRef.current) {
             const suggestions = getActiveSuggestions(newState);
             if (suggestions) {

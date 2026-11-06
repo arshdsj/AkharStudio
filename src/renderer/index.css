@@ -1,6 +1,7 @@
 @import 'prosemirror-view/style/prosemirror.css';
 @import './styles/tokens.css';
 @import './styles/components.css';
+@import './styles/themes.css';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -86,21 +87,24 @@
   font-weight: var(--weight-medium);
 }
 
-/* Screenplay Paper Dimensions - Pro Studio Dark Sheet */
+/* Screenplay Paper Dimensions - Pro Studio Sheet (Adapts to Dark, Darker, Light) */
 .screenplay-paper {
-  background-color: #1e1e22;
-  color: #f2f2f4;
+  background-color: var(--page-surface);
+  color: var(--page-text);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45), 0 20px 56px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.07);
   border-radius: var(--radius-sm);
   font-family: 'Courier Prime', 'Noto Sans Gurmukhi', monospace;
   position: relative;
-  transition: width 0.2s ease, height 0.2s ease;
-  caret-color: var(--accent-text);
+  transition: width 0.2s ease;
+  caret-color: var(--accent-fill);
+  height: auto;
+  box-sizing: border-box;
+  flex-shrink: 0;
 }
 
 .screenplay-paper ::selection {
-  background-color: var(--accent-fill);
-  color: var(--text-on-accent);
+  background-color: var(--surface-selected);
+  color: var(--page-text);
 }
 
 .screenplay-paper.paper-letter {
@@ -113,6 +117,158 @@
   width: 210mm;
   min-height: 297mm;
   padding: 25.4mm 25.4mm 25.4mm 38.1mm;
+}
+
+/* Screenplay Page Break Divider & Multi-Page Sheet Representation (PAGE-01, PAGE-02, PAGE-03, ARCH-04) */
+.screenplay-page-break {
+  position: relative;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+  margin-top: 24pt;
+  margin-bottom: 20pt;
+}
+
+.screenplay-page-break.paper-letter {
+  margin-left: -1.5in;
+  margin-right: -1.0in;
+  width: 8.5in;
+}
+
+.screenplay-page-break.paper-a4 {
+  margin-left: -38.1mm;
+  margin-right: -25.4mm;
+  width: 210mm;
+}
+
+.screenplay-page-break__divider {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.screenplay-page-break__edge-bottom {
+  height: 2px;
+  background: var(--page-surface);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.screenplay-page-break__gap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  height: 36px;
+  background: var(--surface-canvas);
+  margin: 0;
+  padding: 0 24px;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.screenplay-page-break__line {
+  flex: 1;
+  height: 1px;
+  background: var(--line-separator, rgba(255, 255, 255, 0.12));
+}
+
+.screenplay-page-break__badge {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  background: var(--surface-control);
+  padding: 2px 10px;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--line-edge, rgba(255, 255, 255, 0.08));
+}
+
+.screenplay-page-break__edge-top {
+  height: 2px;
+  background: var(--page-surface);
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.screenplay-page-break__header {
+  position: relative;
+  height: 0.6in;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 1.0in;
+  background: var(--page-surface);
+}
+
+.screenplay-page-break.paper-a4 .screenplay-page-break__header {
+  padding-right: 25.4mm;
+}
+
+.screenplay-page-break__number {
+  font-family: 'Courier Prime', 'Noto Sans Gurmukhi', monospace;
+  font-size: 12px;
+  color: var(--text-secondary);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Mid-Block Page Breaks & Presentation Continuation Labels (M2B) */
+.screenplay-mid-block-break {
+  display: block;
+  margin-top: 14pt;
+  margin-bottom: 14pt;
+}
+
+.block-dialogue .screenplay-mid-block-break.paper-letter {
+  margin-left: -2.5in;
+  width: 8.5in;
+}
+
+.block-dialogue .screenplay-mid-block-break.paper-a4 {
+  margin-left: calc(-38.1mm - 25.4mm);
+  width: 210mm;
+}
+
+.block-action .screenplay-mid-block-break.paper-letter {
+  margin-left: -1.5in;
+  width: 8.5in;
+}
+
+.block-action .screenplay-mid-block-break.paper-a4 {
+  margin-left: -38.1mm;
+  width: 210mm;
+}
+
+.screenplay-more-continuation {
+  text-align: center;
+  font-family: 'Courier Prime', 'Noto Sans Gurmukhi', monospace;
+  font-size: 12pt;
+  line-height: 18pt;
+  color: var(--text-primary);
+  margin-bottom: 8pt;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+}
+
+.screenplay-contd-continuation {
+  font-family: 'Courier Prime', 'Noto Sans Gurmukhi', monospace;
+  font-size: 12pt;
+  line-height: 18pt;
+  font-weight: bold;
+  text-transform: uppercase;
+  color: var(--text-primary);
+  margin-left: 3.7in; /* Aligns exactly with character cue (1.5in paper padding + 2.2in character margin) */
+  margin-top: 8pt;
+  margin-bottom: 4pt;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+}
+
+.paper-a4 .screenplay-contd-continuation {
+  margin-left: calc(38.1mm + 2.2in);
 }
 
 /* Screenplay Element Indentations */
