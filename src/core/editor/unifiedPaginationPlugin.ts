@@ -84,7 +84,6 @@ export interface UnifiedPaginationPluginOptions {
   paginationEngine?: IPaginationEngine;
   onPaginationChange?: (result: PaginationResult) => void;
   onFallback?: (reason: NonNullable<UnifiedFallbackReason>, diagnostics: UnifiedPluginDiagnostic[]) => void;
-  deferInitialPagination?: boolean;
 }
 
 export interface UnifiedPaginationState {
@@ -509,20 +508,6 @@ export function createUnifiedPaginationPlugin(
     key: unifiedPaginationPluginKey,
     state: {
       init(_config, instanceState: EditorState): UnifiedPaginationState {
-        if (options.deferInitialPagination) {
-          return {
-            paperSize: initialPaperSize,
-            contdSetting: initialContdSetting,
-            decorations: DecorationSet.empty,
-            paginationResult: null,
-            targets: [],
-            recalcCount: 0,
-            fontStatus: options.fontMetricsProvider?.getStatus() ?? null,
-            isFallback: false,
-            fallbackReason: null,
-            fallbackDiagnostics: [],
-          };
-        }
         try {
           const { layoutBlocks, positionMap, diagnostics } = docToLayoutBlocks(instanceState.doc);
           const unsupportedBlockDiagnostics = diagnostics.filter((d) => d.code === 'UNSUPPORTED_BLOCK_TYPE');
@@ -802,17 +787,6 @@ export function createUnifiedPaginationPlugin(
     },
 
     view(editorView) {
-      if (options.deferInitialPagination) {
-        const schedule = typeof requestAnimationFrame === 'function' ? requestAnimationFrame : setTimeout;
-        schedule(() => {
-          if (!editorView.isDestroyed) {
-            editorView.dispatch(
-              editorView.state.tr.setMeta(unifiedPaginationPluginKey, { forceRecalc: true })
-            );
-          }
-        });
-      }
-
       if (options.fontMetricsProvider) {
         options.fontMetricsProvider
           .ensureLoaded()

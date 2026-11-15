@@ -906,12 +906,36 @@ describe('Permanent Automated Suite: Editor Page Boxes & PDF Physical Geometry P
           expect(test.enginePdfParity).toBe(true);
 
           // Explicit assertions on line wrap content
-          expect(test.domPlainLines[0]).toContain('ਜਿਸ');
-          expect(test.domBoldLines[0]).not.toContain('ਜਿਸ');
-          expect(test.domBoldLines[1]).toContain('ਜਿਸ');
+          expect(test.domPlainLines[0]).toContain('ਦੇ');
+          expect(test.domBoldLines[0]).not.toContain('ਦੇ');
+          expect(test.domBoldLines[1]).toContain('ਦੇ');
 
           expect(test.engineBoldLines).toEqual(test.domBoldLines);
           expect(test.pdfBoldLines).toEqual(test.domBoldLines);
+
+          // 6.2 Italic Gurmukhi Word Line Break Parity (DOM, Engine, PDF)
+          const italicTest = data.italicGurmukhiTest;
+          expect(italicTest).toBeDefined();
+          expect(italicTest.domEngineParity).toBe(true);
+          expect(italicTest.enginePdfParity).toBe(true);
+          expect(italicTest.engineItalicLines).toEqual(italicTest.domItalicLines);
+          expect(italicTest.pdfItalicLines).toEqual(italicTest.domItalicLines);
+
+          // 6.3 Underline Gurmukhi Word Line Break Parity (DOM, Engine, PDF)
+          const underlineTest = data.underlineGurmukhiTest;
+          expect(underlineTest).toBeDefined();
+          expect(underlineTest.domEngineParity).toBe(true);
+          expect(underlineTest.enginePdfParity).toBe(true);
+          expect(underlineTest.engineUnderlineLines).toEqual(underlineTest.domUnderlineLines);
+          expect(underlineTest.pdfUnderlineLines).toEqual(underlineTest.domUnderlineLines);
+
+          // 6.4 Mid-Word Mark Line Break Parity (starts mid-word within a line: DOM, Engine, PDF)
+          const midWordTest = data.midWordMarkTest;
+          expect(midWordTest).toBeDefined();
+          expect(midWordTest.domEngineParity).toBe(true);
+          expect(midWordTest.enginePdfParity).toBe(true);
+          expect(midWordTest.engineMidWordLines).toEqual(midWordTest.domMidWordLines);
+          expect(midWordTest.pdfMidWordLines).toEqual(midWordTest.domMidWordLines);
         } finally {
           if (fs.existsSync(tmpOutputFile)) {
             try {

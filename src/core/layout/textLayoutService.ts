@@ -369,17 +369,23 @@ export class TextLayoutService implements ITextLayoutService {
           div.appendChild(document.createTextNode(text.slice(cur, run.start)));
         }
         const runText = text.slice(run.start, run.end);
+        let node: HTMLElement | Text = document.createTextNode(runText);
+        if (run.underline) {
+          const u = document.createElement('u');
+          u.appendChild(node);
+          node = u;
+        }
+        if (run.italic) {
+          const em = document.createElement('em');
+          em.appendChild(node);
+          node = em;
+        }
         if (run.bold) {
           const strong = document.createElement('strong');
-          strong.textContent = runText;
-          div.appendChild(strong);
-        } else if (run.italic) {
-          const em = document.createElement('em');
-          em.textContent = runText;
-          div.appendChild(em);
-        } else {
-          div.appendChild(document.createTextNode(runText));
+          strong.appendChild(node);
+          node = strong;
         }
+        div.appendChild(node);
         cur = run.end;
       }
       if (cur < text.length) {

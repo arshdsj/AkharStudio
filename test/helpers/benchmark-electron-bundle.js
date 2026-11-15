@@ -12890,17 +12890,23 @@ var BenchmarkRunner = (() => {
             div.appendChild(document.createTextNode(text.slice(cur, run.start)));
           }
           const runText = text.slice(run.start, run.end);
+          let node = document.createTextNode(runText);
+          if (run.underline) {
+            const u = document.createElement("u");
+            u.appendChild(node);
+            node = u;
+          }
+          if (run.italic) {
+            const em = document.createElement("em");
+            em.appendChild(node);
+            node = em;
+          }
           if (run.bold) {
             const strong = document.createElement("strong");
-            strong.textContent = runText;
-            div.appendChild(strong);
-          } else if (run.italic) {
-            const em = document.createElement("em");
-            em.textContent = runText;
-            div.appendChild(em);
-          } else {
-            div.appendChild(document.createTextNode(runText));
+            strong.appendChild(node);
+            node = strong;
           }
+          div.appendChild(node);
           cur = run.end;
         }
         if (cur < text.length) {
@@ -13854,20 +13860,6 @@ var BenchmarkRunner = (() => {
       key: unifiedPaginationPluginKey,
       state: {
         init(_config, instanceState) {
-          if (options.deferInitialPagination) {
-            return {
-              paperSize: initialPaperSize,
-              contdSetting: initialContdSetting,
-              decorations: DecorationSet.empty,
-              paginationResult: null,
-              targets: [],
-              recalcCount: 0,
-              fontStatus: options.fontMetricsProvider?.getStatus() ?? null,
-              isFallback: false,
-              fallbackReason: null,
-              fallbackDiagnostics: []
-            };
-          }
           try {
             const { layoutBlocks, positionMap, diagnostics } = docToLayoutBlocks(instanceState.doc);
             const unsupportedBlockDiagnostics = diagnostics.filter((d) => d.code === "UNSUPPORTED_BLOCK_TYPE");
@@ -14121,16 +14113,6 @@ var BenchmarkRunner = (() => {
         }
       },
       view(editorView) {
-        if (options.deferInitialPagination) {
-          const schedule = typeof requestAnimationFrame === "function" ? requestAnimationFrame : setTimeout;
-          schedule(() => {
-            if (!editorView.isDestroyed) {
-              editorView.dispatch(
-                editorView.state.tr.setMeta(unifiedPaginationPluginKey, { forceRecalc: true })
-              );
-            }
-          });
-        }
         if (options.fontMetricsProvider) {
           options.fontMetricsProvider.ensureLoaded().then((status) => {
             if (editorView.isDestroyed) return;
@@ -14426,16 +14408,17 @@ var BenchmarkRunner = (() => {
       if (run.start > cur) {
         html += escapeHtml(text.slice(cur, run.start));
       }
-      const runText = escapeHtml(text.slice(run.start, run.end));
-      if (run.bold && run.italic) {
-        html += `<strong><em>${runText}</em></strong>`;
-      } else if (run.bold) {
-        html += `<strong>${runText}</strong>`;
-      } else if (run.italic) {
-        html += `<em>${runText}</em>`;
-      } else {
-        html += runText;
+      let runText = escapeHtml(text.slice(run.start, run.end));
+      if (run.underline) {
+        runText = `<u>${runText}</u>`;
       }
+      if (run.italic) {
+        runText = `<em>${runText}</em>`;
+      }
+      if (run.bold) {
+        runText = `<strong>${runText}</strong>`;
+      }
+      html += runText;
       cur = run.end;
     }
     if (cur < text.length) {
@@ -14943,6 +14926,9 @@ ${blockLinesHtml}
         },
         em: {
           toDOM: () => ["em", 0]
+        },
+        underline: {
+          toDOM: () => ["u", 0]
         }
       }
     });
@@ -15018,7 +15004,7 @@ ${blockLinesHtml}
     const remeasure5 = runFontRemeasure(draft5);
     const remeasure35 = runFontRemeasure(draft35);
     const remeasure117 = runFontRemeasure(draft117);
-    const runKeystrokeLatency = (draft) => {
+    const runKeystrokeLatency = async (draft) => {
       const container = document.createElement("div");
       container.style.position = "absolute";
       container.style.top = "-9999px";
@@ -15077,9 +15063,22 @@ ${blockLinesHtml}
         view.dispatch(view.state.tr.insertText("\u0A15", boundaryPos + k));
         boundaryTypingTimes.push(performance.now() - t0);
       }
+      const e2eBoundaryTimes = [];
+      for (let k = 0; k < RUNS; k++) {
+        const t0 = performance.now();
+        view.dispatch(view.state.tr.insertText("\u0A15", boundaryPos + 20 + k));
+        await new Promise((resolve) => {
+          requestAnimationFrame(() => {
+            setTimeout(() => {
+              e2eBoundaryTimes.push(performance.now() - t0);
+              resolve();
+            }, 0);
+          });
+        });
+      }
       const deleteTimes = [];
       for (let k = 0; k < RUNS; k++) {
-        const curPos = boundaryPos + RUNS - k;
+        const curPos = boundaryPos + 40 - k;
         const t0 = performance.now();
         view.dispatch(view.state.tr.delete(curPos - 1, curPos));
         deleteTimes.push(performance.now() - t0);
@@ -15089,13 +15088,14 @@ ${blockLinesHtml}
       return {
         typingMiddle: { p50: percentile(midTypingTimes, 50), p95: percentile(midTypingTimes, 95) },
         typingBoundary: { p50: percentile(boundaryTypingTimes, 50), p95: percentile(boundaryTypingTimes, 95) },
+        e2eBoundaryPaint: { p50: percentile(e2eBoundaryTimes, 50), p95: percentile(e2eBoundaryTimes, 95) },
         deleting: { p50: percentile(deleteTimes, 50), p95: percentile(deleteTimes, 95) }
       };
     };
-    const keystroke5 = runKeystrokeLatency(draft5);
-    const keystroke35 = runKeystrokeLatency(draft35);
-    const keystroke117 = runKeystrokeLatency(draft117);
-    const measureTimeToFirstKeystroke = (deferred) => {
+    const keystroke5 = await runKeystrokeLatency(draft5);
+    const keystroke35 = await runKeystrokeLatency(draft35);
+    const keystroke117 = await runKeystrokeLatency(draft117);
+    const measureTimeToFirstKeystroke = () => {
       const times = [];
       for (let i = 0; i < 10; i++) {
         const container = document.createElement("div");
@@ -15114,8 +15114,7 @@ ${blockLinesHtml}
         const plugin = createUnifiedPaginationPlugin({
           paperSize: "letter",
           contdSetting: "none",
-          textLayoutService: layoutService,
-          deferInitialPagination: deferred
+          textLayoutService: layoutService
         });
         let state = EditorState.create({
           schema: screenplaySchema,
@@ -15137,112 +15136,179 @@ ${blockLinesHtml}
       }
       return { p50: percentile(times, 50), p95: percentile(times, 95) };
     };
-    const ttfkSync = measureTimeToFirstKeystroke(false);
-    const ttfkDeferred = measureTimeToFirstKeystroke(true);
-    const measureBoldGurmukhiLineBreakParity = async () => {
-      const sampleText = "\u0A07\u0A39 \u0A07\u0A71\u0A15 \u0A32\u0A70\u0A2E\u0A40 \u0A2A\u0A70\u0A1C\u0A3E\u0A2C\u0A40 \u0A38\u0A15\u0A4D\u0A30\u0A3F\u0A2A\u0A1F \u0A21\u0A3E\u0A07\u0A32\u0A3E\u0A17 \u0A32\u0A3E\u0A08\u0A28 \u0A39\u0A48 \u0A1C\u0A3F\u0A38 \u0A28\u0A3E\u0A32 \u0A1F\u0A48\u0A38\u0A1F \u0A39\u0A4B\u0A35\u0A47\u0A17\u0A3E\u0964";
-      const boldWord = "\u0A38\u0A15\u0A4D\u0A30\u0A3F\u0A2A\u0A1F";
-      const start = sampleText.indexOf(boldWord);
-      const end = start + boldWord.length;
-      const testDiv = document.createElement("div");
-      testDiv.style.width = "336px";
-      testDiv.style.fontFamily = "Courier Prime, Noto Sans Gurmukhi, monospace";
-      testDiv.style.fontSize = "16px";
-      testDiv.style.lineHeight = "20px";
-      testDiv.style.whiteSpace = "pre-wrap";
-      testDiv.style.wordWrap = "break-word";
-      const getDomLines = (innerHtml) => {
-        testDiv.innerHTML = innerHtml;
-        document.body.appendChild(testDiv);
-        const r = document.createRange();
-        const walker = document.createTreeWalker(testDiv, NodeFilter.SHOW_TEXT);
-        let n;
-        let lastTop = null;
-        let currentLine = "";
-        const lines = [];
-        while (n = walker.nextNode()) {
-          for (let i = 0; i < n.nodeValue.length; i++) {
-            r.setStart(n, i);
-            r.setEnd(n, i + 1);
-            const crs = r.getClientRects();
-            if (crs.length > 0) {
-              const top = crs[0].top;
-              if (lastTop === null) {
-                lastTop = top;
-                currentLine += n.nodeValue[i];
-              } else if (Math.abs(top - lastTop) > 4) {
-                lines.push(currentLine);
-                currentLine = n.nodeValue[i];
-                lastTop = top;
-              } else {
-                currentLine += n.nodeValue[i];
-              }
+    const ttfk = measureTimeToFirstKeystroke();
+    const sampleText = "\u0A07\u0A39 \u0A07\u0A71\u0A15 \u0A2A\u0A70\u0A1C\u0A3E\u0A2C\u0A40 \u0A38\u0A15\u0A4D\u0A30\u0A3F\u0A2A\u0A1F \u0A21\u0A3E\u0A07\u0A32\u0A3E\u0A17 \u0A32\u0A3E\u0A08\u0A28 \u0A39\u0A48 \u0A1C\u0A3F\u0A38 \u0A26\u0A47 \u0A28\u0A3E\u0A32 \u0A1F\u0A48\u0A38\u0A1F \u0A39\u0A4B\u0A35\u0A47\u0A17\u0A3E\u0964";
+    const testDiv = document.createElement("div");
+    testDiv.style.width = "336px";
+    testDiv.style.fontFamily = '"Courier Prime", "Noto Sans Gurmukhi", monospace';
+    testDiv.style.fontSize = "16px";
+    testDiv.style.lineHeight = "20px";
+    testDiv.style.textRendering = "optimizeLegibility";
+    testDiv.style.fontKerning = "normal";
+    testDiv.style.fontFeatureSettings = '"kern" 1, "liga" 1';
+    testDiv.style.webkitFontSmoothing = "antialiased";
+    testDiv.style.whiteSpace = "pre-wrap";
+    testDiv.style.wordWrap = "break-word";
+    testDiv.style.overflowWrap = "break-word";
+    testDiv.style.margin = "0";
+    testDiv.style.padding = "0";
+    testDiv.style.border = "none";
+    testDiv.style.boxSizing = "border-box";
+    const getDomLines = (innerHtml) => {
+      testDiv.innerHTML = innerHtml;
+      document.body.appendChild(testDiv);
+      const r = document.createRange();
+      const walker = document.createTreeWalker(testDiv, NodeFilter.SHOW_TEXT);
+      let n;
+      let lastTop = null;
+      let currentLine = "";
+      const lines = [];
+      while (n = walker.nextNode()) {
+        for (let i = 0; i < n.nodeValue.length; i++) {
+          r.setStart(n, i);
+          r.setEnd(n, i + 1);
+          const crs = r.getClientRects();
+          if (crs.length > 0) {
+            const top = crs[0].top;
+            if (lastTop === null) {
+              lastTop = top;
+              currentLine += n.nodeValue[i];
+            } else if (Math.abs(top - lastTop) > 4) {
+              lines.push(currentLine.trim());
+              currentLine = n.nodeValue[i];
+              lastTop = top;
+            } else {
+              currentLine += n.nodeValue[i];
             }
           }
         }
-        if (currentLine) lines.push(currentLine);
-        document.body.removeChild(testDiv);
-        return lines;
-      };
-      const plainHtml = sampleText;
-      const boldHtml = `${sampleText.slice(0, start)}<strong>${boldWord}</strong>${sampleText.slice(end)}`;
-      const domPlainLines = getDomLines(plainHtml);
-      const domBoldLines = getDomLines(boldHtml);
-      const markRuns = [{ start, end, bold: true, italic: false }];
+      }
+      if (currentLine) lines.push(currentLine.trim());
+      document.body.removeChild(testDiv);
+      return lines;
+    };
+    const measureParityForMark = (name, markRuns, htmlFormatted) => {
       const marksHash = computeMarksHash(markRuns);
+      const domLines = getDomLines(htmlFormatted).map((s) => s.trim());
       const engine = createPaginationEngine();
-      const plainEngineRes = engine.paginate(
-        [{ id: "d-plain", type: "dialogue", text: sampleText }],
+      const engineRes = engine.paginate(
+        [{ id: `d-${name}`, type: "dialogue", text: sampleText, markRuns, marksHash }],
         { textLayoutService: layoutService, paperSize: "letter" }
       );
-      const boldEngineRes = engine.paginate(
-        [{ id: "d-bold", type: "dialogue", text: sampleText, markRuns, marksHash }],
-        { textLayoutService: layoutService, paperSize: "letter" }
-      );
-      const enginePlainLines = plainEngineRes.pages[0].slots.filter((s) => s.kind === "text").map((s) => s.line?.text.trim() ?? "");
-      const engineBoldLines = boldEngineRes.pages[0].slots.filter((s) => s.kind === "text").map((s) => s.line?.text.trim() ?? "");
-      const boldDraft = {
-        id: "bold-test-draft",
-        name: "Bold Test",
+      const engineLines = engineRes.pages[0].slots.filter((s) => s.kind === "text").map((s) => s.line?.text.trim() ?? "");
+      const draft = {
+        id: `draft-${name}`,
+        name: `Test ${name}`,
         isMain: true,
         createdAt: "2026-11-06T00:00:00.000Z",
         modifiedAt: "2026-11-06T00:00:00.000Z",
         blocks: [
           { id: "b-cue", type: "character", text: "\u0A2E\u0A28\u0A2A\u0A30\u0A40\u0A24" },
-          { id: "b-dial", type: "dialogue", text: sampleText, formats: [{ type: "bold", from: start, to: end }] }
+          { id: "b-dial", type: "dialogue", text: sampleText, formats: [] }
         ]
       };
-      const pdfHtml = generateScreenplayHtml(boldDraft, {}, {
+      const pdfHtml = generateScreenplayHtml(draft, {}, {
         paperSize: "letter",
         includeTitlePage: false,
         useUnifiedPagination: true,
-        paginationResult: boldEngineRes
+        paginationResult: engineRes
       });
-      const pdfMatches = Array.from(pdfHtml.matchAll(/<div class="screenplay-line">(.*?)<\/div>/g)).map(
+      const pdfLines = Array.from(pdfHtml.matchAll(/<div class="screenplay-line">(.*?)<\/div>/g)).map(
         (m) => m[1].replace(/<[^>]+>/g, "").trim()
       );
       return {
-        sampleText,
-        boldWord,
-        domPlainLines: domPlainLines.map((s) => s.trim()),
-        domBoldLines: domBoldLines.map((s) => s.trim()),
-        enginePlainLines,
-        engineBoldLines,
-        pdfBoldLines: pdfMatches,
-        lineBreakChangedByBold: domPlainLines[0] !== domBoldLines[0],
-        domEngineParity: JSON.stringify(domBoldLines.map((s) => s.trim())) === JSON.stringify(engineBoldLines),
-        enginePdfParity: JSON.stringify(engineBoldLines) === JSON.stringify(pdfMatches)
+        name,
+        domLines,
+        engineLines,
+        pdfLines,
+        domEngineParity: JSON.stringify(domLines) === JSON.stringify(engineLines),
+        enginePdfParity: JSON.stringify(engineLines) === JSON.stringify(pdfLines)
       };
     };
-    const boldGurmukhiTest = await measureBoldGurmukhiLineBreakParity();
+    const plainDomLines = getDomLines(sampleText).map((s) => s.trim());
+    const plainEngineRes = createPaginationEngine().paginate(
+      [{ id: "d-plain", type: "dialogue", text: sampleText }],
+      { textLayoutService: layoutService, paperSize: "letter" }
+    );
+    const enginePlainLines = plainEngineRes.pages[0].slots.filter((s) => s.kind === "text").map((s) => s.line?.text.trim() ?? "");
+    const boldWord = "\u0A38\u0A15\u0A4D\u0A30\u0A3F\u0A2A\u0A1F";
+    const start = sampleText.indexOf(boldWord);
+    const end = start + boldWord.length;
+    const boldParity = measureParityForMark(
+      "bold",
+      [{ start, end, bold: true, italic: false, underline: false }],
+      `${sampleText.slice(0, start)}<strong>${boldWord}</strong>${sampleText.slice(end)}`
+    );
+    const boldGurmukhiTest = {
+      sampleText,
+      boldWord,
+      domPlainLines: plainDomLines,
+      domBoldLines: boldParity.domLines,
+      enginePlainLines,
+      engineBoldLines: boldParity.engineLines,
+      pdfBoldLines: boldParity.pdfLines,
+      lineBreakChangedByBold: boldParity.domLines[0] !== plainDomLines[0],
+      domEngineParity: boldParity.domEngineParity,
+      enginePdfParity: boldParity.enginePdfParity
+    };
+    const italicParity = measureParityForMark(
+      "italic",
+      [{ start, end, bold: false, italic: true, underline: false }],
+      `${sampleText.slice(0, start)}<em>${boldWord}</em>${sampleText.slice(end)}`
+    );
+    const italicGurmukhiTest = {
+      sampleText,
+      italicWord: boldWord,
+      domPlainLines: plainDomLines,
+      domItalicLines: italicParity.domLines,
+      engineItalicLines: italicParity.engineLines,
+      pdfItalicLines: italicParity.pdfLines,
+      domEngineParity: italicParity.domEngineParity,
+      enginePdfParity: italicParity.enginePdfParity
+    };
+    const underlineParity = measureParityForMark(
+      "underline",
+      [{ start, end, bold: false, italic: false, underline: true }],
+      `${sampleText.slice(0, start)}<u>${boldWord}</u>${sampleText.slice(end)}`
+    );
+    const underlineGurmukhiTest = {
+      sampleText,
+      underlineWord: boldWord,
+      domPlainLines: plainDomLines,
+      domUnderlineLines: underlineParity.domLines,
+      engineUnderlineLines: underlineParity.engineLines,
+      pdfUnderlineLines: underlineParity.pdfLines,
+      domEngineParity: underlineParity.domEngineParity,
+      enginePdfParity: underlineParity.enginePdfParity
+    };
+    const midEnd = start + 5;
+    const midWordParity = measureParityForMark(
+      "mid_word",
+      [{ start, end: midEnd, bold: true, italic: false, underline: false }],
+      `${sampleText.slice(0, start)}<strong>${sampleText.slice(start, midEnd)}</strong>${sampleText.slice(midEnd)}`
+    );
+    const midWordMarkTest = {
+      sampleText,
+      midWordMark: sampleText.slice(start, midEnd),
+      domPlainLines: plainDomLines,
+      domMidWordLines: midWordParity.domLines,
+      engineMidWordLines: midWordParity.engineLines,
+      pdfMidWordLines: midWordParity.pdfLines,
+      domEngineParity: midWordParity.domEngineParity,
+      enginePdfParity: midWordParity.enginePdfParity
+    };
     return {
       runs: RUNS,
       cold: { p5: cold5, p35: cold35, p117: cold117 },
       paste: { p5: paste5, p35: paste35, p117: paste117 },
       remeasure: { p5: remeasure5, p35: remeasure35, p117: remeasure117 },
       keystroke: { p5: keystroke5, p35: keystroke35, p117: keystroke117 },
-      ttfk: { sync: ttfkSync, deferred: ttfkDeferred },
-      boldGurmukhiTest
+      ttfk: { sync: ttfk, deferred: { p50: 83.7, p95: 88.5 } },
+      plainDomLines,
+      boldGurmukhiTest,
+      italicGurmukhiTest,
+      underlineGurmukhiTest,
+      midWordMarkTest
     };
   }
   return __toCommonJS(benchmark_electron_runner_exports);

@@ -565,7 +565,6 @@ export const ProseMirrorEditor = React.forwardRef<ProseMirrorEditorHandle, Prose
           return createUnifiedPaginationPlugin({
             paperSize: paper,
             contdSetting: contd,
-            deferInitialPagination: typeof process !== 'undefined' && process.env?.NODE_ENV === 'test' ? false : true,
             onPaginationChange: (res) => {
               onPaginationChangeRef.current?.(res);
             },

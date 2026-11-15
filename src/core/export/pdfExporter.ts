@@ -132,16 +132,17 @@ function renderFormattedLineText(text: string, markRuns?: TextMarkRun[]): string
     if (run.start > cur) {
       html += escapeHtml(text.slice(cur, run.start));
     }
-    const runText = escapeHtml(text.slice(run.start, run.end));
-    if (run.bold && run.italic) {
-      html += `<strong><em>${runText}</em></strong>`;
-    } else if (run.bold) {
-      html += `<strong>${runText}</strong>`;
-    } else if (run.italic) {
-      html += `<em>${runText}</em>`;
-    } else {
-      html += runText;
+    let runText = escapeHtml(text.slice(run.start, run.end));
+    if (run.underline) {
+      runText = `<u>${runText}</u>`;
     }
+    if (run.italic) {
+      runText = `<em>${runText}</em>`;
+    }
+    if (run.bold) {
+      runText = `<strong>${runText}</strong>`;
+    }
+    html += runText;
     cur = run.end;
   }
   if (cur < text.length) {
