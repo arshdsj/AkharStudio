@@ -167,7 +167,7 @@ export function generatePhoneticTypoVariants(roman: string): string[] {
     variants.add(lower.replace(/c/g, 'ch'));
   }
 
-  // 2. Vowel & glide variants (w <-> v, ia <-> iya)
+  // 2. Vowel & glide variants (w <-> v, ia <-> iya, oi <-> oyi, ai <-> ayi, oe <-> oye)
   if (lower.includes('w')) {
     variants.add(lower.replace(/w/g, 'v'));
   }
@@ -175,6 +175,35 @@ export function generatePhoneticTypoVariants(roman: string): string[] {
     variants.add(lower.replace(/iya/g, 'ia'));
   } else if (lower.includes('ia')) {
     variants.add(lower.replace(/ia/g, 'iya'));
+  }
+
+  // oi <-> oyi (e.g. rasoi <-> rasoyi -> ਰਸੋਈ, koi <-> koyi -> ਕੋਈ, hoi <-> hoyi -> ਹੋਈ)
+  if (lower.includes('oyi')) {
+    variants.add(lower.replace(/oyi/g, 'oi'));
+  } else if (lower.includes('oi')) {
+    variants.add(lower.replace(/oi/g, 'oyi'));
+  }
+
+  // ai <-> ayi (e.g. bhai <-> bhayi, safai <-> safayi, ladai <-> ladayi)
+  if (lower.includes('ayi')) {
+    variants.add(lower.replace(/ayi/g, 'ai'));
+  } else if (lower.includes('ai')) {
+    variants.add(lower.replace(/ai/g, 'ayi'));
+  }
+
+  // oe <-> oye (e.g. hoe <-> hoye -> ਹੋਏ, roe <-> roye -> ਰੋਏ)
+  if (lower.includes('oye')) {
+    variants.add(lower.replace(/oye/g, 'oe'));
+  } else if (lower.includes('oe')) {
+    variants.add(lower.replace(/oe/g, 'oye'));
+  }
+
+  // oee / oyee -> oi / oyi
+  if (lower.includes('oee')) {
+    variants.add(lower.replace(/oee/g, 'oi'));
+  }
+  if (lower.includes('oyee')) {
+    variants.add(lower.replace(/oyee/g, 'oyi'));
   }
 
   return Array.from(variants).filter((v) => v !== lower);
@@ -416,6 +445,20 @@ export class GurmukhiTransliterator {
       }
       if (lower.endsWith('ye') && normalized.endsWith('\u0A0F')) {
         score += 50_000;
+      }
+
+      // Diphthong endings -oi, -oyi, -oee, -oyee (e.g. 'rasoi' / 'rasoyi' -> 'ਰਸੋਈ', 'koi' / 'koyi' -> 'ਕੋਈ', 'hoi' / 'hoyi' -> 'ਹੋਈ')
+      if (
+        (lower.endsWith('oi') || lower.endsWith('oyi') || lower.endsWith('oee') || lower.endsWith('oyee')) &&
+        normalized.endsWith('\u0A4B\u0A08')
+      ) {
+        score += 150_000;
+      }
+      if (
+        (lower.endsWith('oe') || lower.endsWith('oye')) &&
+        normalized.endsWith('\u0A4B\u0A0F')
+      ) {
+        score += 150_000;
       }
 
       if ((lower.endsWith('eh') || lower.endsWith('ehar')) && normalized.includes('\u0A39\u0A3F')) {
@@ -758,6 +801,30 @@ export class GurmukhiTransliterator {
         }
       }
 
+      // Diphthongs -oi, -oyi, -oee, -oyee -> ੋਈ / ਓਈ (e.g. rasoi / rasoyi -> ਰਸੋਈ, koi / koyi -> ਕੋਈ, hoi / hoyi -> ਹੋਈ, soi -> ਸੋਈ, dhoi -> ਧੋਈ, roi -> ਰੋਈ)
+      for (const [suffix, gurmukhiSuffix, indepGurmukhiSuffix] of [
+        ['oyian', '\u0A4B\u0A08\u0A06\u0A02', '\u0A13\u0A08\u0A06\u0A02'],
+        ['oian', '\u0A4B\u0A08\u0A06\u0A02', '\u0A13\u0A08\u0A06\u0A02'],
+        ['oyee', '\u0A4B\u0A08', '\u0A13\u0A08'],
+        ['oee', '\u0A4B\u0A08', '\u0A13\u0A08'],
+        ['oyi', '\u0A4B\u0A08', '\u0A13\u0A08'],
+        ['oi', '\u0A4B\u0A08', '\u0A13\u0A08'],
+        ['oye', '\u0A4B\u0A0F', '\u0A13\u0A0F'],
+        ['oe', '\u0A4B\u0A0F', '\u0A13\u0A0F'],
+      ] as const) {
+        if (remaining.startsWith(suffix)) {
+          const prev = current.length > 0 ? current[current.length - 1] : '';
+          if (isWordStart) {
+            parse(idx + suffix.length, indepGurmukhiSuffix, false);
+          } else if (prev === '\u0A4B') {
+            const indepSuffix = suffix.includes('e') ? '\u0A0F' : '\u0A08';
+            parse(idx + suffix.length, current + indepSuffix, false);
+          } else if (!'ਾਿੀੁੂੇੈੋੌ\u0A71\u0A70\u0A02\u0A4D'.includes(prev)) {
+            parse(idx + suffix.length, current + gurmukhiSuffix, false);
+          }
+        }
+      }
+
       // 0. Diphthong sequences:
       // A. Plural / oblique nasalized suffixes: -eyan, -iyan (len 4), -ian, -ean (len 3)
       if (
@@ -874,11 +941,11 @@ export class GurmukhiTransliterator {
         }
       }
 
-      // H. Verbal past & hiatus endings: -yi -> 'ਈ' and -ye -> 'ਏ' (e.g. 'gyi' -> 'ਗਈ', 'gye' -> 'ਗਏ', 'pyi' -> 'ਪਈ', 'pye' -> 'ਪਏ', 'lyi' -> 'ਲਈ', 'lye' -> 'ਲਏ')
+      // H. Verbal past & hiatus endings: -yi -> 'ਈ' and -ye -> 'ਏ' (e.g. 'gyi' -> 'ਗਈ', 'gye' -> 'ਗਏ', 'pyi' -> 'ਪਈ', 'pye' -> 'ਪਏ', 'lyi' -> 'ਲਈ', 'lye' -> 'ਲਏ', 'rasoyi' -> 'ਰਸੋਈ')
       if (idx + 2 <= roman.length && (roman.substring(idx, idx + 2) === 'yi' || roman.substring(idx, idx + 2) === 'ye')) {
         const isYi = roman.substring(idx, idx + 2) === 'yi';
         const prev = current.length > 0 ? current[current.length - 1] : '';
-        if (prev && !'ਾਿੀੁੂੇੈੋੌ\u0A71\u0A70\u0A02\u0A4D'.includes(prev)) {
+        if (prev && (!'ਾਿੀੁੂੇੈੋੌ\u0A71\u0A70\u0A02\u0A4D'.includes(prev) || prev === '\u0A4B' || prev === '\u0A3E')) {
           if (idx + 4 <= roman.length && (roman.substring(idx, idx + 4) === 'yian' || roman.substring(idx, idx + 4) === 'yean')) {
             parse(idx + 4, current + '\u0A08\u0A06\u0A02', false); // ਗਈਆਂ
           } else {
@@ -1004,7 +1071,9 @@ export class GurmukhiTransliterator {
 
           // Vowel chunk
           if (DEP_VOWELS[chunk]) {
-            const vowels = isWordStart
+            const prevChar = current.length > 0 ? current[current.length - 1] : '';
+            const isAfterVowelMatra = 'ਾਿੀੁੂੇੈੋੌ'.includes(prevChar);
+            const vowels = (isWordStart || isAfterVowelMatra)
               ? INDEP_VOWELS[chunk] || []
               : DEP_VOWELS[chunk] || [];
             for (const v of vowels) {

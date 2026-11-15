@@ -18,7 +18,6 @@ import {
   Maximize2,
   Activity,
   FileSpreadsheet,
-  Database,
   Languages,
 } from 'lucide-react';
 import { SaveStatus, ProjectSource } from '../../types/screenplay';
@@ -53,7 +52,7 @@ export const HeaderRow1: React.FC<HeaderRow1Props> = ({
   saveStatus,
   autosaveEnabled = true,
   currentFilePath,
-  projectSource = 'database',
+  projectSource: _projectSource = 'database',
   onOpenLibrary,
   onOpenRomanConverter,
   onOpenSearch,
@@ -121,8 +120,10 @@ export const HeaderRow1: React.FC<HeaderRow1Props> = ({
         {/* macOS Traffic Lights spacer */}
         {isMac && <div className="w-[72px] shrink-0 pointer-events-none" aria-hidden="true" />}
 
-        {/* AkharStudio Brand Logo */}
-        <AkharStudioLogo className="mr-1" />
+        {/* AkharStudio Brand Logo (Fixed width container prevents layout shifting on language swap) */}
+        <div className="w-[160px] shrink-0 flex items-center">
+          <AkharStudioLogo className="mr-1" />
+        </div>
 
         <div style={{ width: '1px', height: '16px', background: 'var(--line-separator)' }} />
 
@@ -281,31 +282,22 @@ export const HeaderRow1: React.FC<HeaderRow1Props> = ({
         </div>
       </div>
 
-      {/* Far Right Area: File name & Minimal Icon-Only Diagnostic System */}
+      {/* Far Right Area: Standalone file path (if open) & Minimal Icon-Only Diagnostic System */}
       <div className="flex items-center space-x-2.5 no-drag">
-        {/* Current File Path / Database indicator */}
-        <div
-          className="flex items-center gap-1.5 truncate max-w-[240px] font-mono"
-          style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}
-        >
-          {projectSource === 'database' ? (
-            <span
-              className="flex items-center gap-1 font-sans font-medium text-[11px]"
-              style={{ color: 'var(--text-accent)' }}
+        {/* Optional standalone file path (Local database indicator removed in v1.6) */}
+        {currentFilePath && (
+          <>
+            <div
+              className="flex items-center gap-1.5 truncate max-w-[240px] font-mono"
+              style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}
             >
-              <Database size={12} />
-              <span>Local Database</span>
-            </span>
-          ) : currentFilePath ? (
-            <span title={currentFilePath} className="truncate">
-              {currentFilePath.split('/').pop() || currentFilePath.split('\\').pop()}
-            </span>
-          ) : (
-            <span className="italic" style={{ color: 'var(--text-disabled)' }}>Untitled Script (Unsaved)</span>
-          )}
-        </div>
-
-        <div style={{ width: '1px', height: '16px', background: 'var(--line-separator)' }} />
+              <span title={currentFilePath} className="truncate">
+                {currentFilePath.split('/').pop() || currentFilePath.split('\\').pop()}
+              </span>
+            </div>
+            <div style={{ width: '1px', height: '16px', background: 'var(--line-separator)' }} />
+          </>
+        )}
 
         {/* Minimal Icon-Only Diagnostic System */}
         <div

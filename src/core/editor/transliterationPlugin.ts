@@ -311,17 +311,49 @@ export function createTransliterationPlugin(
             return true;
           }
 
-          // Escape: dismiss popup; keep Roman buffer (DEC-011)
+          // Escape: dismiss popup; keep Roman buffer in document (DEC-011, v1.6 UX)
           if (event.key === 'Escape') {
             event.preventDefault();
-            updateAndNotify({ isActive: false }, view);
+            const literal = pluginState.romanBuffer;
+            const anchor = pluginState.anchorPos !== null ? pluginState.anchorPos : view.state.selection.from;
+            const tr = view.state.tr.insertText(literal, anchor, anchor);
+            view.dispatch(tr);
+            const newPos = anchor + literal.length;
+            updateAndNotify({
+              isActive: false,
+              romanBuffer: literal,
+              candidates: [],
+              selectedIndex: 0,
+              anchorPos: null,
+              lastCommitted: {
+                roman: literal,
+                gurmukhi: literal,
+                pos: newPos,
+              },
+            }, view);
             return true;
           }
 
-          // Tab: dismiss popup and consume key (DEC-011)
+          // Tab: dismiss popup, retain English text in document (DEC-011)
           if (event.key === 'Tab') {
             event.preventDefault();
-            updateAndNotify({ isActive: false }, view);
+            const literal = pluginState.romanBuffer;
+            const anchor = pluginState.anchorPos !== null ? pluginState.anchorPos : view.state.selection.from;
+            const tr = view.state.tr.insertText(literal, anchor, anchor);
+            view.dispatch(tr);
+            const newPos = anchor + literal.length;
+            updateAndNotify({
+              isActive: false,
+              romanBuffer: literal,
+              candidates: [],
+              selectedIndex: 0,
+              anchorPos: null,
+              lastCommitted: {
+                roman: literal,
+                gurmukhi: literal,
+                pos: newPos,
+              },
+            }, view);
             return true;
           }
 
@@ -423,7 +455,10 @@ export function createTransliterationPlugin(
               updateAndNotify({ isActive: false, romanBuffer: '', candidates: [], anchorPos: null }, view);
             } else {
               const detailed = transliterator.suggestWithDetails(newBuf, 5);
-              const newCands = detailed.candidates;
+              const newCands = [...detailed.candidates];
+              if (!newBuf.startsWith('{') && !newCands.includes(newBuf)) {
+                newCands.push(newBuf);
+              }
               if (recorder && recorder.isRecording()) {
                 recorder.recordSuggest(
                   newBuf,
@@ -454,13 +489,23 @@ export function createTransliterationPlugin(
           /^[a-zA-Z{}_\-]$/.test(event.key)
         ) {
           event.preventDefault();
+
+          // Standard text-editor convention: typing after selecting replaces selection entirely
+          if (!view.state.selection.empty) {
+            const deleteTr = view.state.tr.deleteSelection();
+            view.dispatch(deleteTr);
+          }
+
           const currentAnchor =
             pluginState.isActive && pluginState.anchorPos !== null
               ? pluginState.anchorPos
               : view.state.selection.from;
           const newBuffer = (pluginState.isActive ? pluginState.romanBuffer : '') + event.key;
           const detailed = transliterator.suggestWithDetails(newBuffer, 5);
-          const candidates = detailed.candidates;
+          const candidates = [...detailed.candidates];
+          if (!newBuffer.startsWith('{') && !candidates.includes(newBuffer)) {
+            candidates.push(newBuffer);
+          }
 
           if (recorder && recorder.isRecording()) {
             recorder.recordSuggest(

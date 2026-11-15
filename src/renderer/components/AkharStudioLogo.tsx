@@ -55,11 +55,27 @@ export const AkharStudioLogo: React.FC<AkharStudioLogoProps> = ({
   const isLg = size === 'lg';
   const isSm = size === 'sm';
 
+  const containerWidthClass = isHero
+    ? 'w-[320px]'
+    : isLg
+    ? 'w-[240px]'
+    : isSm
+    ? 'w-[130px]'
+    : 'w-[160px]';
+
+  const prefixWidthClass = isHero
+    ? 'w-[100px]'
+    : isLg
+    ? 'w-[75px]'
+    : isSm
+    ? 'w-[34px]'
+    : 'w-[44px]';
+
   return (
     <div
       onClick={mode ? undefined : triggerTransition}
       title={mode ? undefined : "AkharStudio (ਅੱਖਰStudio) — Click to switch logo script"}
-      className={`flex items-center gap-3 select-none group ${mode ? '' : 'cursor-pointer'} transition-all duration-300 ${className}`}
+      className={`flex items-center gap-3 select-none group ${mode ? '' : 'cursor-pointer'} transition-all duration-300 shrink-0 ${containerWidthClass} ${className}`}
     >
       {/* Official AkharStudio Icon Mark: Gurmukhi 'ਅ' + Film Strip + Script Red Margin */}
       <div
@@ -80,7 +96,7 @@ export const AkharStudioLogo: React.FC<AkharStudioLogoProps> = ({
         />
       </div>
 
-      {/* Typography: Smoothly transitions between AkharStudio and ਅੱਖਰStudio */}
+      {/* Typography: Smoothly transitions between AkharStudio and ਅੱਖਰStudio with zero layout shift */}
       <div
         className={`flex items-center ${
           isHero
@@ -90,35 +106,41 @@ export const AkharStudioLogo: React.FC<AkharStudioLogoProps> = ({
             : isSm
             ? 'text-xs font-semibold'
             : 'text-sm font-semibold'
-        } tracking-tight transition-transform duration-300`}
+        } tracking-tight transition-transform duration-300 shrink-0`}
       >
+        <div className={`relative inline-flex items-center justify-start ${prefixWidthClass} shrink-0 overflow-hidden`}>
+          <span
+            className={`transition-all duration-300 transform leading-none ${
+              isAnimating
+                ? 'opacity-0 scale-95 -translate-y-1'
+                : 'opacity-100 scale-100 translate-y-0'
+            } ${
+              langMode === 'pa'
+                ? `${
+                    isHero
+                      ? 'font-bold text-3xl text-white tracking-normal font-sans'
+                      : isLg
+                      ? 'font-bold text-2xl text-white tracking-normal font-sans'
+                      : isSm
+                      ? 'font-bold text-xs text-white tracking-normal font-sans'
+                      : 'font-bold text-sm text-white tracking-normal font-sans'
+                  }`
+                : `${
+                    isHero
+                      ? 'font-bold text-3xl text-white tracking-tight'
+                      : isLg
+                      ? 'font-bold text-2xl text-white tracking-tight'
+                      : isSm
+                      ? 'font-bold text-xs text-white tracking-tight'
+                      : 'font-bold text-sm text-white tracking-tight'
+                  }`
+            }`}
+          >
+            {langMode === 'en' ? 'Akhar' : 'ਅੱਖਰ'}
+          </span>
+        </div>
         <span
-          className={`transition-all duration-300 transform ${
-            isAnimating
-              ? 'opacity-0 scale-95 -translate-y-1'
-              : 'opacity-100 scale-100 translate-y-0'
-          } ${
-            langMode === 'pa'
-              ? `${
-                  isHero
-                    ? 'font-bold text-3xl text-white tracking-normal font-sans'
-                    : isLg
-                    ? 'font-bold text-2xl text-white tracking-normal font-sans'
-                    : 'font-bold text-[15px] text-white tracking-normal font-sans'
-                }`
-              : `${
-                  isHero
-                    ? 'font-bold text-3xl text-white tracking-tight'
-                    : isLg
-                    ? 'font-bold text-2xl text-white tracking-tight'
-                    : 'font-bold text-white tracking-tight'
-                }`
-          }`}
-        >
-          {langMode === 'en' ? 'Akhar' : 'ਅੱਖਰ'}
-        </span>
-        <span
-          className={`text-zinc-400 font-medium ml-1 tracking-normal ${
+          className={`text-zinc-400 font-medium ml-1 tracking-normal leading-none shrink-0 ${
             isHero ? 'text-3xl' : isLg ? 'text-2xl' : ''
           }`}
         >
@@ -131,7 +153,7 @@ export const AkharStudioLogo: React.FC<AkharStudioLogoProps> = ({
               : isLg
               ? 'ml-2 px-1.5 py-0.5 text-[10px]'
               : 'ml-1.5 px-1 py-0.2 text-[9px]'
-          } font-semibold uppercase tracking-wider text-rose-400/90 bg-rose-500/10 border border-rose-500/20 rounded`}
+          } font-semibold uppercase tracking-wider text-rose-400/90 bg-rose-500/10 border border-rose-500/20 rounded leading-none shrink-0`}
         >
           Go
         </span>

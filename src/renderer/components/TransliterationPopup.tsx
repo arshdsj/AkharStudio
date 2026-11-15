@@ -86,9 +86,24 @@ export const TransliterationPopup: React.FC<TransliterationPopupProps> = ({
                 <span className="font-mono w-3" style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>
                   {idx + 1}.
                 </span>
-                <span className="text-base tracking-wide gurmukhi font-medium" style={{ color: 'var(--text-primary)' }}>
+                <span
+                  className={`text-base tracking-wide font-medium ${cand === romanBuffer ? 'font-sans' : 'gurmukhi'}`}
+                  style={{ color: 'var(--text-primary)' }}
+                >
                   {cand}
                 </span>
+                {cand === romanBuffer && (
+                  <span
+                    className="text-[10px] font-sans font-semibold uppercase px-1.5 py-0.5 rounded tracking-wider"
+                    style={{
+                      background: 'var(--surface-control)',
+                      color: 'var(--text-secondary)',
+                      border: '1px solid var(--line-separator)',
+                    }}
+                  >
+                    English
+                  </span>
+                )}
               </div>
               {isSelected && (
                 <span
@@ -114,7 +129,7 @@ export const TransliterationPopup: React.FC<TransliterationPopupProps> = ({
         }}
       >
         <span>↑↓ to navigate</span>
-        <span>Esc to dismiss</span>
+        <span>Esc to keep English</span>
       </div>
     </div>
   );

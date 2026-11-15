@@ -126,6 +126,94 @@ describe('Phase 3: ProseMirror Transliteration Plugin Integration & Keyboard Con
     dispatchKey('Escape');
     expect(pluginState.isActive).toBe(false);
     expect(pluginState.romanBuffer).toBe('munda'); // Retains Roman buffer
+    // v1.6 UX Fix: English text is committed into the document rather than erased
+    expect(view.state.doc.child(0).textContent).toBe('munda');
+  });
+
+  it('v1.6: typing "OK" and pressing Escape preserves "OK" in document without erasing', () => {
+    for (const char of 'OK') {
+      dispatchKey(char);
+    }
+    expect(pluginState.isActive).toBe(true);
+    expect(pluginState.candidates).toContain('OK');
+
+    // Press Escape: dismisses suggestion menu and preserves "OK" in document
+    dispatchKey('Escape');
+    expect(pluginState.isActive).toBe(false);
+    expect(view.state.doc.child(0).textContent).toBe('OK');
+  });
+
+  it('v1.6: selecting English candidate "OK" and pressing Space commits "OK "', () => {
+    for (const char of 'OK') {
+      dispatchKey(char);
+    }
+    expect(pluginState.isActive).toBe(true);
+    const okIdx = pluginState.candidates.indexOf('OK');
+    expect(okIdx).toBeGreaterThan(0);
+
+    // Arrow down to "OK"
+    for (let i = 0; i < okIdx; i++) {
+      dispatchKey('ArrowDown');
+    }
+    expect(pluginState.selectedIndex).toBe(okIdx);
+
+    // Press Space to commit "OK "
+    dispatchKey(' ');
+    expect(pluginState.isActive).toBe(false);
+    expect(view.state.doc.child(0).textContent).toBe('OK ');
+  });
+
+  it('v1.6: text selection replacement: typing replaces selected text entirely (keyboard selection)', () => {
+    // 1. Commit initial text "ਕਿੱਥੇ ਪੁੱਤ "
+    for (const char of 'kitthe') {
+      dispatchKey(char);
+    }
+    dispatchKey(' ');
+    for (const char of 'putt') {
+      dispatchKey(char);
+    }
+    dispatchKey(' ');
+    expect(view.state.doc.child(0).textContent).toBe('ਕਿੱਥੇ ਪੁੱਤ ');
+
+    // 2. Select "ਪੁੱਤ " (pos 7 to 12)
+    const { TextSelection } = require('prosemirror-state');
+    const tr = view.state.tr.setSelection(TextSelection.create(view.state.doc, 7, 12));
+    view.dispatch(tr);
+    expect(view.state.selection.empty).toBe(false);
+
+    // 3. Type new word "full" while text is selected
+    for (const char of 'full') {
+      dispatchKey(char);
+    }
+    // Commit with Space
+    dispatchKey(' ');
+
+    // 4. Verify selected text "ਪੁੱਤ " was completely replaced by "ਫੁੱਲ ", NOT prepended!
+    expect(view.state.doc.child(0).textContent).toBe('ਕਿੱਥੇ ਫੁੱਲ ');
+  });
+
+  it('v1.6: text selection replacement: typing replaces selected text entirely (mouse selection)', () => {
+    // 1. Commit initial text "ਪੰਜਾਬ "
+    for (const char of 'punjab') {
+      dispatchKey(char);
+    }
+    dispatchKey(' ');
+    expect(view.state.doc.child(0).textContent).toBe('ਪੰਜਾਬ ');
+
+    // 2. Select entire word "ਪੰਜਾਬ " (pos 1 to 7) simulating mouse drag selection
+    const { TextSelection } = require('prosemirror-state');
+    const tr = view.state.tr.setSelection(TextSelection.create(view.state.doc, 1, 7));
+    view.dispatch(tr);
+    expect(view.state.selection.empty).toBe(false);
+
+    // 3. Type "OK" and press Escape to replace selected text with English "OK"
+    for (const char of 'OK') {
+      dispatchKey(char);
+    }
+    dispatchKey('Escape');
+
+    // 4. Verify "ਪੰਜਾਬ " is replaced entirely by "OK"
+    expect(view.state.doc.child(0).textContent).toBe('OK');
   });
 
   it('Backspace on committed text deletes Gurmukhi Unicode components predictably and never restores Roman buffer', () => {
