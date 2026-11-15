@@ -21,9 +21,6 @@ import {
   createUnifiedPaginationPlugin,
   unifiedPaginationPluginKey,
 } from '../src/core/editor/unifiedPaginationPlugin';
-import {
-  createPaginationPlugin,
-} from '../src/core/editor/paginationPlugin';
 import { generateUnifiedScreenplayPdfHtml } from '../src/core/export/pdfExporter';
 import { createPaginationEngine } from '../src/core/layout/paginationEngine';
 import { draftToLayoutBlocks } from '../src/core/layout/paginationAdapter';
@@ -208,53 +205,9 @@ describe('Milestone M2F — Stage 2: Performance Benchmark Harness', () => {
   });
 
   // ===========================================================================
-  // 4. Mode Switching Benchmarks (state.reconfigure)
+  // 4. PDF Export Generation Benchmarks (Letter & A4)
   // ===========================================================================
-  describe('4. Mode Switching Latency', () => {
-    it('switches Legacy <-> Unified within 50ms across short, medium, and long scripts', () => {
-      const workloads = [
-        { name: 'Short (5p)', draft: shortDraft },
-        { name: 'Medium (35p)', draft: medDraft },
-        { name: 'Long (117p)', draft: longDraft },
-      ];
-
-      for (const w of workloads) {
-        const doc = draftToProseMirrorDoc(w.draft);
-        const unifiedPlugin = createUnifiedPaginationPlugin({
-          paperSize: 'letter',
-          contdSetting: 'on',
-          textLayoutService: layoutService,
-        });
-        const legacyPlugin = createPaginationPlugin({ paperSize: 'letter' });
-
-        let state = EditorState.create({
-          doc,
-          schema: screenplaySchema,
-          plugins: [legacyPlugin],
-        });
-
-        // Legacy -> Unified
-        const t0 = performance.now();
-        state = state.reconfigure({ plugins: [unifiedPlugin] });
-        unifiedPlugin.props.decorations!.call(unifiedPlugin, state);
-        const legacyToUnifiedMs = performance.now() - t0;
-
-        // Unified -> Legacy
-        const t1 = performance.now();
-        state = state.reconfigure({ plugins: [legacyPlugin] });
-        legacyPlugin.props.decorations!.call(legacyPlugin, state);
-        const unifiedToLegacyMs = performance.now() - t1;
-
-        expect(legacyToUnifiedMs).toBeLessThan(75);
-        expect(unifiedToLegacyMs).toBeLessThan(20); // Legacy teardown is near-instant (<1ms)
-      }
-    });
-  });
-
-  // ===========================================================================
-  // 5. PDF Export Generation Benchmarks (Letter & A4)
-  // ===========================================================================
-  describe('5. PDF Export Generation Benchmarks', () => {
+  describe('4. PDF Export Generation Benchmarks', () => {
     it('generates complete discrete-sheet PDF HTML for 117-page feature scripts in <50ms', () => {
       for (const paper of ['letter', 'a4'] as const) {
         for (const draft of [shortDraft, medDraft, longDraft]) {

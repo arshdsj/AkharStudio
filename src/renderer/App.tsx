@@ -36,6 +36,7 @@ import {
   PaperSize,
   ContdSetting,
 } from '../types/screenplay';
+import { PaginationResult } from '../core/layout/paginationEngine';
 
 import {
   createDefaultProject,
@@ -284,6 +285,7 @@ export const App: React.FC = () => {
   const isSavingInProgressRef = useRef(false);
   const lastSavedRevisionRef = useRef(project.revision);
   const lastSavedTimeRef = useRef(Date.now());
+  const lastPaginationResultRef = useRef<PaginationResult | null>(null);
 
   // Dynamic current page tracking based on active block in screenplay
   const currentPage = useMemo(() => {
@@ -1112,6 +1114,7 @@ export const App: React.FC = () => {
         password: options.password,
         preserveCharacterHighlights: options.preserveCharacterHighlights,
         useUnifiedPagination: isUnifiedPaginationActive && !isEditorFallback,
+        paginationResult: (!customDraft && options.paperSize === project.settings.paperSize) ? (lastPaginationResultRef.current || undefined) : undefined,
       });
       if (res.success) {
         console.log('PDF exported successfully to:', res.filePath);
@@ -1358,6 +1361,10 @@ export const App: React.FC = () => {
             if (status.isFallback && status.fallbackReason) {
               console.warn(`[App] Editor pagination fell back to legacy: ${status.fallbackReason}`);
             }
+          }}
+          onPaginationChange={(res) => {
+            lastPaginationResultRef.current = res;
+            (window as any).__lastPaginationResult = res;
           }}
         />
 

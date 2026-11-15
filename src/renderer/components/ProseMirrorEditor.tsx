@@ -48,6 +48,7 @@ import {
   createUnifiedPaginationPlugin,
   unifiedPaginationPluginKey,
 } from '../../core/editor/unifiedPaginationPlugin';
+import { PaginationResult } from '../../core/layout/paginationEngine';
 import { KeyOutput } from '../../core/editor/gurmukhiKeyboardMappings';
 import { SuggestionPopup } from './SuggestionPopup';
 import { TransliterationPopup } from './TransliterationPopup';
@@ -126,6 +127,7 @@ interface ProseMirrorEditorProps {
   onDetectRomanPunjabiPaste?: (text: string) => void;
   useUnifiedPagination?: boolean;
   onPaginationEngineStatusChange?: (status: PaginationEngineStatus) => void;
+  onPaginationChange?: (result: PaginationResult) => void;
   initialSelection?: { from: number; to: number } | null;
   onSelectionChange?: (sel: { from: number; to: number }) => void;
 }
@@ -150,6 +152,7 @@ export const ProseMirrorEditor = React.forwardRef<ProseMirrorEditorHandle, Prose
       onDetectRomanPunjabiPaste,
       useUnifiedPagination = false,
       onPaginationEngineStatusChange,
+      onPaginationChange,
       initialSelection = null,
       onSelectionChange,
     },
@@ -170,6 +173,9 @@ export const ProseMirrorEditor = React.forwardRef<ProseMirrorEditorHandle, Prose
 
     const onPaginationEngineStatusChangeRef = useRef(onPaginationEngineStatusChange);
     onPaginationEngineStatusChangeRef.current = onPaginationEngineStatusChange;
+
+    const onPaginationChangeRef = useRef(onPaginationChange);
+    onPaginationChangeRef.current = onPaginationChange;
 
     const inputModeRef = useRef(inputMode);
     inputModeRef.current = inputMode;
@@ -556,30 +562,21 @@ export const ProseMirrorEditor = React.forwardRef<ProseMirrorEditorHandle, Prose
             engine: 'unified',
             isFallback: false,
           });
-          try {
-            return createUnifiedPaginationPlugin({
-              paperSize: paper,
-              contdSetting: contd,
-              onFallback: (reason) => {
-                onPaginationEngineStatusChangeRef.current?.({
-                  engine: 'unified',
-                  isFallback: true,
-                  fallbackReason: reason,
-                });
-              },
-            });
-          } catch (err) {
-            console.error(
-              '[ProseMirrorEditor] Failed to construct unified pagination plugin, falling back to legacy plugin:',
-              err
-            );
-            onPaginationEngineStatusChangeRef.current?.({
-              engine: 'unified',
-              isFallback: true,
-              fallbackReason: 'layout_crash',
-            });
-            return createPaginationPlugin({ paperSize: paper });
-          }
+          return createUnifiedPaginationPlugin({
+            paperSize: paper,
+            contdSetting: contd,
+            deferInitialPagination: typeof process !== 'undefined' && process.env?.NODE_ENV === 'test' ? false : true,
+            onPaginationChange: (res) => {
+              onPaginationChangeRef.current?.(res);
+            },
+            onFallback: (reason) => {
+              onPaginationEngineStatusChangeRef.current?.({
+                engine: 'unified',
+                isFallback: true,
+                fallbackReason: reason,
+              });
+            },
+          });
         } else {
           onPaginationEngineStatusChangeRef.current?.({
             engine: 'legacy',

@@ -40,7 +40,16 @@ export interface TitleMetadata {
 }
 
 export type PaperSize = 'letter' | 'a4';
-export type ContdSetting = 'unasked' | 'on' | 'off';
+export type ContdSetting =
+  | 'none'
+  | 'more_only'
+  | 'contd_only'
+  | 'both'
+  | 'reprint_name'
+  | 'all'
+  | 'on'
+  | 'off'
+  | 'unasked';
 
 export interface HighlightCharactersSetting {
   enabled: boolean;

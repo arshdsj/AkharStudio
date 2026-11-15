@@ -24,6 +24,7 @@ import {
   createDefaultProject,
 } from '../src/core/model/ProjectModel';
 import { ScriptDraft, TitleMetadata } from '../src/types/screenplay';
+import { LINE_PITCH_PX } from '../src/core/layout/screenplayGeometry';
 
 // UI Components
 import { StatusChip } from '../src/renderer/components/StatusChip';
@@ -136,6 +137,7 @@ describe('AkharStudio Enhancements Test Suite', () => {
       const html = generateScreenplayHtml(sampleDraft, sampleMetadata, {
         paperSize: 'letter',
         includeTitlePage: false,
+        allowHeadlessFallback: true,
       });
 
       // Verify .character CSS class contains font-weight: bold
@@ -155,29 +157,33 @@ describe('AkharStudio Enhancements Test Suite', () => {
       expect(dialogueCssMatch![1]).not.toContain('font-weight: bold');
     });
 
-    it('adds a subtle horizontal separator line immediately before every scene heading', () => {
+    it('formats scene headings with canonical Option B geometry and page-top border suppression', () => {
       const html = generateScreenplayHtml(sampleDraft, sampleMetadata, {
         paperSize: 'letter',
         includeTitlePage: false,
+        allowHeadlessFallback: true,
       });
 
-      // Verify .scene-heading has border-top separator styling
+      // Verify .scene-heading has canonical Option B styling
       const sceneHeadingCssMatch = html.match(/\.scene-heading\s*\{([^}]+)\}/);
       expect(sceneHeadingCssMatch).not.toBeNull();
       const sceneHeadingCss = sceneHeadingCssMatch![1];
 
-      // Thin, understated light-grey line
-      expect(sceneHeadingCss).toMatch(/border-top:\s*0\.5pt\s+solid/i);
-      // Vertical spacing so line does not touch heading text
-      expect(sceneHeadingCss).toContain('padding-top: 8pt');
-      expect(sceneHeadingCss).toContain('margin-top: 18pt');
-      // Non-orphaning guarantees
-      expect(sceneHeadingCss).toContain('page-break-after: avoid');
-      expect(sceneHeadingCss).toContain('page-break-inside: avoid');
+      expect(sceneHeadingCss).toContain(`margin-top: ${2 * LINE_PITCH_PX}px`);
+      expect(sceneHeadingCss).toContain(`margin-bottom: ${LINE_PITCH_PX}px`);
+      expect(sceneHeadingCss).toContain('text-transform: uppercase');
+      expect(sceneHeadingCss).toContain('font-weight: bold');
+      expect(sceneHeadingCss).toContain('border-top: none');
+
+      // Top-of-page blocks suppress border-top and spacing
+      expect(html).toContain('.page-content > :first-child');
+      expect(html).toContain('border-top: none !important');
 
       // Verify both scene headings in the sample draft are rendered with scene-heading class
-      expect(html).toContain('<div class="scene-heading" id="b1">EXT. PUNJAB FARM - MORNING</div>');
-      expect(html).toContain('<div class="scene-heading" id="b10">INT. HAVELI - NIGHT</div>');
+      expect(html).toContain('id="b1"');
+      expect(html).toContain('EXT. PUNJAB FARM - MORNING');
+      expect(html).toContain('id="b10"');
+      expect(html).toContain('INT. HAVELI - NIGHT');
     });
   });
 

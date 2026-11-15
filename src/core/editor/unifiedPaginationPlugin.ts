@@ -21,9 +21,6 @@ import {
   PageBreakDecorationTarget,
 } from '../layout/paginationAdapter';
 import {
-  calculateBlockEstimatedLines,
-} from './paginationPlugin';
-import {
   createPaginationEngine,
   IPaginationEngine,
   PaginationResult,
@@ -59,6 +56,7 @@ export type UnifiedFallbackReason =
   | 'incomplete_layout'
   | 'engine_error'
   | 'init_error'
+  | 'emergency_fallback'
   | null;
 
 export type UnifiedPluginDiagnosticCode =
@@ -67,7 +65,8 @@ export type UnifiedPluginDiagnosticCode =
   | 'OUT_OF_BOUNDS_POSITION'
   | 'INCOMPLETE_LAYOUT'
   | 'INIT_ERROR'
-  | 'ENGINE_ERROR';
+  | 'ENGINE_ERROR'
+  | 'EMERGENCY_FALLBACK';
 
 export interface UnifiedPluginDiagnostic {
   level: 'error' | 'warning';
@@ -85,6 +84,7 @@ export interface UnifiedPaginationPluginOptions {
   paginationEngine?: IPaginationEngine;
   onPaginationChange?: (result: PaginationResult) => void;
   onFallback?: (reason: NonNullable<UnifiedFallbackReason>, diagnostics: UnifiedPluginDiagnostic[]) => void;
+  deferInitialPagination?: boolean;
 }
 
 export interface UnifiedPaginationState {
@@ -106,6 +106,8 @@ export interface UnifiedPaginationState {
 
 /**
  * Creates the DOM element for clean between-block virtual page breaks.
+ * Fills previous page remainder + bottom margin, places "PAGE n" bar between page boxes,
+ * and fills new page top margin (96px) containing the running header.
  */
 export function createUnifiedPageBreakDOM(
   target: PageBreakDecorationTarget,
@@ -120,13 +122,13 @@ export function createUnifiedPageBreakDOM(
   container.setAttribute('data-break-type', target.breakType);
   container.setAttribute('data-pagination-engine', 'unified');
 
-  // Full-width sheet separator with bottom edge, canvas gap with PAGE badge, and top edge
-  const divider = document.createElement('div');
-  divider.className = 'screenplay-page-break__divider';
+  // 1. Bottom spacer for remainder of previous page + bottom margin (96px)
+  const spacerBottom = document.createElement('div');
+  spacerBottom.className = 'screenplay-page-break__spacer-bottom';
+  spacerBottom.style.height = `${target.bottomSpacerPx ?? 120}px`;
+  container.appendChild(spacerBottom);
 
-  const bottomEdge = document.createElement('div');
-  bottomEdge.className = 'screenplay-page-break__edge-bottom';
-
+  // 2. The "PAGE n" divider bar between page boxes
   const gap = document.createElement('div');
   gap.className = 'screenplay-page-break__gap';
 
@@ -143,15 +145,12 @@ export function createUnifiedPageBreakDOM(
   gap.appendChild(leftLine);
   gap.appendChild(badge);
   gap.appendChild(rightLine);
+  container.appendChild(gap);
 
-  const topEdge = document.createElement('div');
-  topEdge.className = 'screenplay-page-break__edge-top';
+  // 3. Top spacer for new page's top margin (96px), containing running header
+  const spacerTop = document.createElement('div');
+  spacerTop.className = 'screenplay-page-break__spacer-top';
 
-  divider.appendChild(bottomEdge);
-  divider.appendChild(gap);
-  divider.appendChild(topEdge);
-
-  // Running page header with top right page number '2.', '3.', etc. (suppressed on Page 1)
   const header = document.createElement('div');
   header.className = 'screenplay-page-break__header';
 
@@ -160,9 +159,8 @@ export function createUnifiedPageBreakDOM(
   pageNum.textContent = `${target.pageNumber}.`;
 
   header.appendChild(pageNum);
-
-  container.appendChild(divider);
-  container.appendChild(header);
+  spacerTop.appendChild(header);
+  container.appendChild(spacerTop);
 
   return container;
 }
@@ -192,13 +190,13 @@ export function createUnifiedMidBlockBreakDOM(
     container.appendChild(moreEl);
   }
 
-  // 2. Full-width sheet separator
-  const divider = document.createElement('div');
-  divider.className = 'screenplay-page-break__divider';
+  // 2. Bottom spacer for remainder of previous page + bottom margin (96px)
+  const spacerBottom = document.createElement('div');
+  spacerBottom.className = 'screenplay-page-break__spacer-bottom';
+  spacerBottom.style.height = `${target.bottomSpacerPx ?? 120}px`;
+  container.appendChild(spacerBottom);
 
-  const bottomEdge = document.createElement('div');
-  bottomEdge.className = 'screenplay-page-break__edge-bottom';
-
+  // 3. The "PAGE n" divider bar between page boxes
   const gap = document.createElement('div');
   gap.className = 'screenplay-page-break__gap';
 
@@ -215,17 +213,12 @@ export function createUnifiedMidBlockBreakDOM(
   gap.appendChild(leftLine);
   gap.appendChild(badge);
   gap.appendChild(rightLine);
+  container.appendChild(gap);
 
-  const topEdge = document.createElement('div');
-  topEdge.className = 'screenplay-page-break__edge-top';
+  // 4. Top spacer for new page's top margin (96px), containing running header
+  const spacerTop = document.createElement('div');
+  spacerTop.className = 'screenplay-page-break__spacer-top';
 
-  divider.appendChild(bottomEdge);
-  divider.appendChild(gap);
-  divider.appendChild(topEdge);
-
-  container.appendChild(divider);
-
-  // 3. Running page header
   const header = document.createElement('div');
   header.className = 'screenplay-page-break__header';
 
@@ -234,9 +227,10 @@ export function createUnifiedMidBlockBreakDOM(
   pageNum.textContent = `${target.pageNumber}.`;
 
   header.appendChild(pageNum);
-  container.appendChild(header);
+  spacerTop.appendChild(header);
+  container.appendChild(spacerTop);
 
-  // 4. Presentation CHARACTER (CONT'D) after the break on new page
+  // 5. Presentation CHARACTER (CONT'D) after the break on new page
   if (target.contdText) {
     const contdEl = document.createElement('div');
     contdEl.className = 'screenplay-contd-continuation select-none';
@@ -251,10 +245,12 @@ export function createUnifiedMidBlockBreakDOM(
 /**
  * Creates the DOM element for fallback page breaks when unified pagination
  * encounters an unsupported block or layout engine error.
+ * Prominently displays "PAGE n • DEGRADED" so degraded mode is visibly evident.
  */
 export function createFallbackPageBreakDOM(
   pageNumber: number,
-  paperSize: PaperSize = 'letter'
+  paperSize: PaperSize = 'letter',
+  reason?: string
 ): HTMLElement {
   const container = document.createElement('div');
   container.className = `screenplay-page-break screenplay-fallback-page-break select-none ${
@@ -262,7 +258,7 @@ export function createFallbackPageBreakDOM(
   }`;
   container.setAttribute('contenteditable', 'false');
   container.setAttribute('data-page-break', String(pageNumber));
-  container.setAttribute('data-pagination-engine', 'legacy-fallback');
+  container.setAttribute('data-pagination-engine', 'unified-degraded');
 
   const divider = document.createElement('div');
   divider.className = 'screenplay-page-break__divider';
@@ -277,8 +273,11 @@ export function createFallbackPageBreakDOM(
   leftLine.className = 'screenplay-page-break__line';
 
   const badge = document.createElement('div');
-  badge.className = 'screenplay-page-break__badge';
-  badge.textContent = `PAGE ${pageNumber}`;
+  badge.className = 'screenplay-page-break__badge screenplay-page-break__badge--degraded';
+  badge.textContent = `PAGE ${pageNumber} • DEGRADED`;
+  if (reason) {
+    badge.title = `Degraded pagination: ${reason}`;
+  }
 
   const rightLine = document.createElement('div');
   rightLine.className = 'screenplay-page-break__line';
@@ -310,84 +309,114 @@ export function createFallbackPageBreakDOM(
 }
 
 /**
- * Computes safe legacy-style page break decorations directly from a ProseMirror doc
- * when unified pagination encounters unsupported blocks or layout engine errors.
- * Ensures the editor remains fully interactive and visual page boundaries exist without
- * corrupting canonical document state.
+ * Degraded pagination fallback mode.
+ *
+ * HOW IT CAN DIFFER FROM REAL LAYOUT:
+ * 1. Monospace Advance Widths vs Real Font Shaping:
+ *    When DOM/Canvas measurement is unavailable or has failed, degraded mode lays out text
+ *    using synthetic monospace Courier metrics (7.2pt per character at 12pt). It does NOT
+ *    perform HarfBuzz/Chromium complex Gurmukhi text shaping, ligature clustering, or kerning.
+ *    Consequently, Gurmukhi lines with stacked subjoined consonants or complex conjuncts
+ *    (e.g., 'ਕ੍ਰਿੱਪਾ') may wrap earlier or later than in the live Chromium renderer.
+ * 2. Unsupported Block Coercion:
+ *    Unrecognized block types are coerced to standard 'action' blocks (1-slot top margin,
+ *    full printable width) to guarantee valid page boundaries instead of crashing.
+ * 3. Emergency Line Counting:
+ *    If an unhandled exception occurs inside paginate(), the engine partitions blocks using
+ *    slot estimation based on character length without DOM measurement.
+ *
+ * The degraded state is visually explicit via an amber "PAGE N • DEGRADED" badge.
+ * The user's ContdSetting is preserved and passed through.
  */
-export function computeFallbackLegacyDecorations(
+export function computeUnifiedDegradedDecorations(
   doc: PMNode,
-  paperSize: PaperSize = 'letter'
+  paperSize: PaperSize = 'letter',
+  contdSetting: ContdSetting = 'none',
+  reason: NonNullable<UnifiedFallbackReason> | string = 'engine_error',
+  onFallback?: (reason: NonNullable<UnifiedFallbackReason>, diagnostics: UnifiedPluginDiagnostic[]) => void,
+  engine?: IPaginationEngine
 ): DecorationSet {
-  const linesPerPage = paperSize === 'a4' ? 58 : 54;
-  const decos: Decoration[] = [];
+  const { layoutBlocks, positionMap } = docToLayoutBlocks(doc);
 
-  interface BlockInfo {
-    offset: number;
-    type: ScreenplayBlockType;
-    lines: number;
-  }
-
-  const blocks: BlockInfo[] = [];
-  doc.forEach((node, offset) => {
-    if (node.type.name === 'screenplay_block') {
-      const type = (node.attrs.type as ScreenplayBlockType) || 'action';
-      const lines = calculateBlockEstimatedLines(type, node.textContent);
-      blocks.push({ offset, type, lines });
-    }
-  });
-
-  if (blocks.length === 0) {
+  if (layoutBlocks.length === 0) {
     return DecorationSet.empty;
   }
 
-  let linesOnCurrentPage = 0;
-  let currentPage = 1;
+  // Sanitize any unrecognized block types to 'action'
+  const safeBlocks = layoutBlocks.map((b) => ({
+    ...b,
+    type: (['scene_heading', 'action', 'character', 'parenthetical', 'dialogue', 'transition', 'shot'].includes(b.type)
+      ? b.type
+      : 'action') as ScreenplayBlockType,
+  }));
 
-  for (let i = 0; i < blocks.length; i++) {
-    const b = blocks[i];
+  try {
+    const paginationEngine = engine || createPaginationEngine();
+    const paginationResult = paginationEngine.paginate(safeBlocks, {
+      paperSize,
+      contdSetting,
+    });
 
-    if (linesOnCurrentPage + b.lines > linesPerPage && linesOnCurrentPage > 12) {
-      let breakIndex = i;
+    const targets = extractPageBreakTargets(paginationResult, positionMap);
+    const decos: Decoration[] = [];
 
-      // Anti-orphan rule (ARCH-04): never isolate Character cue or parenthetical at page bottom
-      if (b.type === 'dialogue' && i > 0 && blocks[i - 1].type === 'character') {
-        breakIndex = i - 1;
-      } else if (b.type === 'parenthetical' && i > 0 && blocks[i - 1].type === 'character') {
-        breakIndex = i - 1;
-      } else if (b.type === 'character' && i < blocks.length - 1) {
-        breakIndex = i;
+    for (const target of targets) {
+      if (target.pmPos >= 0 && target.pmPos <= doc.content.size) {
+        decos.push(
+          Decoration.widget(
+            target.pmPos,
+            () => createFallbackPageBreakDOM(target.pageNumber, paperSize, reason),
+            {
+              side: -1,
+              stopEvent: () => true,
+              key: `degraded-break-${target.pageNumber}-${target.pmPos}`,
+            }
+          )
+        );
       }
-
-      const targetBlock = blocks[breakIndex];
-      const pageNum = currentPage + 1;
-      const paper = paperSize;
-
-      decos.push(
-        Decoration.widget(
-          targetBlock.offset,
-          () => createFallbackPageBreakDOM(pageNum, paper),
-          {
-            side: -1,
-            stopEvent: () => true,
-            key: `fallback-page-break-${pageNum}-${targetBlock.offset}`,
-          }
-        )
-      );
-
-      currentPage++;
-      if (breakIndex < i) {
-        linesOnCurrentPage = blocks[breakIndex].lines + b.lines;
-      } else {
-        linesOnCurrentPage = b.lines;
-      }
-    } else {
-      linesOnCurrentPage += b.lines;
     }
-  }
 
-  return DecorationSet.create(doc, decos);
+    return DecorationSet.create(doc, decos);
+  } catch (err) {
+    // Ultra-conservative fallback if even paginate() throws (emergency character-count path)
+    const diag: UnifiedPluginDiagnostic = {
+      level: 'error',
+      code: 'EMERGENCY_FALLBACK',
+      message: String(err instanceof Error ? err.message : err),
+    };
+    onFallback?.('emergency_fallback', [diag]);
+    const decos: Decoration[] = [];
+    const slotsPerPage = paperSize === 'a4' ? 46 : 43;
+    let currentSlots = 0;
+    let pageNum = 1;
+
+    for (let i = 0; i < safeBlocks.length; i++) {
+      const b = safeBlocks[i];
+      const estSlots = Math.max(1, Math.ceil(b.text.length / 50)) + (b.type === 'scene_heading' ? 2 : 1);
+      if (currentSlots + estSlots > slotsPerPage && currentSlots > 6) {
+        const pmPos = positionMap.blocks[i]?.nodeStartPos ?? 0;
+        pageNum++;
+        decos.push(
+          Decoration.widget(
+            pmPos,
+            () => createFallbackPageBreakDOM(pageNum, paperSize, 'emergency_fallback'),
+            {
+              side: -1,
+              stopEvent: () => true,
+              key: `emergency-break-${pageNum}-${pmPos}`,
+            }
+          )
+        );
+        currentSlots = estSlots;
+      } else {
+        currentSlots += estSlots;
+      }
+    }
+    return DecorationSet.create(doc, decos);
+  }
 }
+
+export const computeFallbackLegacyDecorations = computeUnifiedDegradedDecorations;
 
 // -----------------------------------------------------------------------------
 // 3. Decoration Builder
@@ -480,6 +509,20 @@ export function createUnifiedPaginationPlugin(
     key: unifiedPaginationPluginKey,
     state: {
       init(_config, instanceState: EditorState): UnifiedPaginationState {
+        if (options.deferInitialPagination) {
+          return {
+            paperSize: initialPaperSize,
+            contdSetting: initialContdSetting,
+            decorations: DecorationSet.empty,
+            paginationResult: null,
+            targets: [],
+            recalcCount: 0,
+            fontStatus: options.fontMetricsProvider?.getStatus() ?? null,
+            isFallback: false,
+            fallbackReason: null,
+            fallbackDiagnostics: [],
+          };
+        }
         try {
           const { layoutBlocks, positionMap, diagnostics } = docToLayoutBlocks(instanceState.doc);
           const unsupportedBlockDiagnostics = diagnostics.filter((d) => d.code === 'UNSUPPORTED_BLOCK_TYPE');
@@ -489,7 +532,13 @@ export function createUnifiedPaginationPlugin(
               `[UnifiedPagination] Unsupported block type detected (${unsupportedBlockDiagnostics.map((d) => d.rawType).join(', ')}). Falling back to legacy pagination.`
             );
             options.onFallback?.('unsupported_block', unsupportedBlockDiagnostics);
-            const fallbackDecos = computeFallbackLegacyDecorations(instanceState.doc, initialPaperSize);
+            const fallbackDecos = computeFallbackLegacyDecorations(
+              instanceState.doc,
+              initialPaperSize,
+              initialContdSetting,
+              'unsupported_block',
+              options.onFallback
+            );
             return {
               paperSize: initialPaperSize,
               contdSetting: initialContdSetting,
@@ -519,7 +568,13 @@ export function createUnifiedPaginationPlugin(
               message: 'Pagination engine returned 0 pages for non-empty layout blocks',
             };
             options.onFallback?.('incomplete_layout', [diag]);
-            const fallbackDecos = computeFallbackLegacyDecorations(instanceState.doc, initialPaperSize);
+            const fallbackDecos = computeFallbackLegacyDecorations(
+              instanceState.doc,
+              initialPaperSize,
+              initialContdSetting,
+              'incomplete_layout',
+              options.onFallback
+            );
             return {
               paperSize: initialPaperSize,
               contdSetting: initialContdSetting,
@@ -559,7 +614,13 @@ export function createUnifiedPaginationPlugin(
             message: String(err instanceof Error ? err.message : err),
           };
           options.onFallback?.('init_error', [diag]);
-          const fallbackDecos = computeFallbackLegacyDecorations(instanceState.doc, initialPaperSize);
+          const fallbackDecos = computeFallbackLegacyDecorations(
+            instanceState.doc,
+            initialPaperSize,
+            initialContdSetting,
+            'init_error',
+            options.onFallback
+          );
           return {
             paperSize: initialPaperSize,
             contdSetting: initialContdSetting,
@@ -635,7 +696,13 @@ export function createUnifiedPaginationPlugin(
               `[UnifiedPagination] Unsupported block type detected (${unsupportedBlockDiagnostics.map((d) => d.rawType).join(', ')}). Falling back to legacy pagination.`
             );
             options.onFallback?.('unsupported_block', unsupportedBlockDiagnostics);
-            const fallbackDecos = computeFallbackLegacyDecorations(newState.doc, newPaperSize);
+            const fallbackDecos = computeFallbackLegacyDecorations(
+              newState.doc,
+              newPaperSize,
+              newContdSetting,
+              'unsupported_block',
+              options.onFallback
+            );
             return {
               paperSize: newPaperSize,
               contdSetting: newContdSetting,
@@ -665,7 +732,13 @@ export function createUnifiedPaginationPlugin(
               message: 'Pagination engine returned 0 pages for non-empty layout blocks',
             };
             options.onFallback?.('incomplete_layout', [diag]);
-            const fallbackDecos = computeFallbackLegacyDecorations(newState.doc, newPaperSize);
+            const fallbackDecos = computeFallbackLegacyDecorations(
+              newState.doc,
+              newPaperSize,
+              newContdSetting,
+              'incomplete_layout',
+              options.onFallback
+            );
             return {
               paperSize: newPaperSize,
               contdSetting: newContdSetting,
@@ -705,7 +778,13 @@ export function createUnifiedPaginationPlugin(
             message: String(err instanceof Error ? err.message : err),
           };
           options.onFallback?.('engine_error', [diag]);
-          const fallbackDecos = computeFallbackLegacyDecorations(newState.doc, newPaperSize);
+          const fallbackDecos = computeFallbackLegacyDecorations(
+            newState.doc,
+            newPaperSize,
+            newContdSetting,
+            'engine_error',
+            options.onFallback
+          );
           return {
             paperSize: newPaperSize,
             contdSetting: newContdSetting,
@@ -723,6 +802,17 @@ export function createUnifiedPaginationPlugin(
     },
 
     view(editorView) {
+      if (options.deferInitialPagination) {
+        const schedule = typeof requestAnimationFrame === 'function' ? requestAnimationFrame : setTimeout;
+        schedule(() => {
+          if (!editorView.isDestroyed) {
+            editorView.dispatch(
+              editorView.state.tr.setMeta(unifiedPaginationPluginKey, { forceRecalc: true })
+            );
+          }
+        });
+      }
+
       if (options.fontMetricsProvider) {
         options.fontMetricsProvider
           .ensureLoaded()

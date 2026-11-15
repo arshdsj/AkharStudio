@@ -23,6 +23,7 @@ import {
   generateUnifiedScreenplayPdfHtml,
   validateExportFonts,
 } from '../src/core/export/pdfExporter';
+import { LINE_PITCH_PX } from '../src/core/layout/screenplayGeometry';
 import { createPaginationEngine } from '../src/core/layout/paginationEngine';
 import { draftToLayoutBlocks } from '../src/core/layout/paginationAdapter';
 import { createTextLayoutService } from '../src/core/layout/textLayoutService';
@@ -108,7 +109,7 @@ describe('Milestone M2C: Shared Pagination PDF Integration', () => {
       expect(html).toContain('class="page-sheet screenplay-page-sheet" data-page-number="1"');
     });
 
-    it('enforces 18.0pt strict line-box baseline pitch on screenplay lines and slot spacers', () => {
+    it('enforces 22.4px canonical line-height pitch on screenplay lines and slot spacers', () => {
       const blocks: ScreenplayBlock[] = [
         { id: 'sh1', type: 'scene_heading', text: 'INT. ROOM - NIGHT' },
         { id: 'ch1', type: 'character', text: 'ਰਾਜਵਿੰਦਰ' },
@@ -122,11 +123,10 @@ describe('Milestone M2C: Shared Pagination PDF Integration', () => {
         ...defaultHeadlessOptions,
       });
 
-      expect(html).toContain('line-height: 18pt;');
+      expect(html).toContain(`line-height: ${LINE_PITCH_PX}px;`);
       expect(html).toContain('.screenplay-line {');
-      expect(html).toContain('height: 18pt;');
-      expect(html).toContain('.slot-blank-line {');
-      expect(html).toContain('height: 18pt;');
+      expect(html).toContain(`height: ${LINE_PITCH_PX}px;`);
+      expect(html).toContain('font-size: 16px;');
     });
   });
 
@@ -166,8 +166,12 @@ describe('Milestone M2C: Shared Pagination PDF Integration', () => {
   // ---------------------------------------------------------------------------
   describe('3. Dialogue Continuation & ContdSetting (on vs off)', () => {
     const createSplittingDialogueDraft = (): ScriptDraft => {
-      // 16 action blocks consume 31 slots (1st block = 1 slot, 15 blocks = 30 slots: 1 blank + 1 line)
-      const actionBlocks: ScreenplayBlock[] = Array.from({ length: 16 }, (_, i) => ({
+      // 19 action blocks consume 1 + 18*2 = 37 slots
+      // Character cue consumes 1 blank + 1 cue = 2 slots (total 39 slots used)
+      // Available slots on page 1: 43 - 39 = 4 slots
+      // Dialogue needs minSplitBefore + MORE (1 slot) on page 1!
+      // Remaining lines split onto page 2!
+      const actionBlocks: ScreenplayBlock[] = Array.from({ length: 19 }, (_, i) => ({
         id: `lead-act-${i}`,
         type: 'action',
         text: `Leading action line ${i + 1}.`,
@@ -326,7 +330,7 @@ describe('Milestone M2C: Shared Pagination PDF Integration', () => {
 
     it('preserves mid-block split lines in correct sequence across sheets', () => {
       const blocks: ScreenplayBlock[] = [
-        ...Array.from({ length: 16 }, (_, i) => ({
+        ...Array.from({ length: 19 }, (_, i) => ({
           id: `lead-${i}`,
           type: 'action' as const,
           text: `Padding line ${i + 1}`,
@@ -335,7 +339,7 @@ describe('Milestone M2C: Shared Pagination PDF Integration', () => {
         {
           id: 'dial-split',
           type: 'dialogue',
-          text: 'ਪਹਿਲਾ ਵਾਕ ਪਹਿਲੇ ਪੰਨੇ ਤੇ ਆਉਂਦਾ ਹੈ।\nਦੂਜਾ ਵਾਕ ਵੀ ਪਹਿਲੇ ਪੰਨੇ ਤੇ ਆਉਂਦਾ ਹੈ।\nਤੀਜਾ ਵਾਕ ਦੂਜੇ ਪੰਨੇ ਤੇ ਚਲਾ ਜਾਂਦਾ ਹੈ।\nਚੌਥਾ ਵਾਕ ਦੂਜੇ ਪੰਨੇ ਤੇ ਖ਼ਤਮ ਹੁੰਦਾ ਹੈ।',
+          text: 'ਪਹਿਲਾ ਵਾਕ ਪਹਿਲੇ ਪੰਨੇ ਤੇ ਆਉਂਦਾ ਹੈ।\nਦੂਜਾ ਵਾਕ ਵੀ ਪਹਿਲੇ ਪੰਨੇ ਤੇ ਆਉਂਦਾ ਹੈ।\nਤੀਜਾ ਵਾਕ ਦੂਜੇ ਪੰਨੇ ਤੇ ਚਲਾ ਜਾਂਦਾ ਹੈ।\nਚੌਥਾ ਵਾਕ ਦੂਜੇ ਪੰਨੇ ਤੇ ਖ਼ਤਮ ਹੁੰਦਾ ਹੈ।\nਪੰਜਵਾਂ ਵਾਕ ਹੋਰ ਅੱਗੇ।',
         },
       ];
       const draft = createTestDraft(blocks);
@@ -348,8 +352,8 @@ describe('Milestone M2C: Shared Pagination PDF Integration', () => {
       });
 
       // Split dialogue ID exists on both sheet 1 and sheet 2
-      const page1Match = html.match(/data-page-number="1">([\s\S]*?)<\/div>\s*<div class="page-sheet/);
-      const page2Match = html.match(/data-page-number="2">([\s\S]*?)<\/div>\s*<\/body>/);
+      const page1Match = html.match(/<div class="page-sheet screenplay-page-sheet" data-page-number="1">([\s\S]*?)(?:<div class="page-sheet|<\/body>)/);
+      const page2Match = html.match(/<div class="page-sheet screenplay-page-sheet" data-page-number="2">([\s\S]*?)(?:<div class="page-sheet|<\/body>)/);
 
       expect(page1Match![1]).toContain('id="dial-split"');
       expect(page1Match![1]).toContain('ਪਹਿਲਾ ਵਾਕ ਪਹਿਲੇ ਪੰਨੇ ਤੇ ਆਉਂਦਾ ਹੈ।');
@@ -357,7 +361,7 @@ describe('Milestone M2C: Shared Pagination PDF Integration', () => {
 
       expect(page2Match![1]).toContain('ਅਮਨ (CONT&#39;D)');
       expect(page2Match![1]).toContain('id="dial-split"');
-      expect(page2Match![1]).toContain('ਤੀਜਾ ਵਾਕ ਦੂਜੇ ਪੰਨੇ ਤੇ ਚਲਾ ਜਾਂਦਾ ਹੈ।');
+      expect(page2Match![1]).toContain('ਚੌਥਾ ਵਾਕ ਦੂਜੇ ਪੰਨੇ ਤੇ ਖ਼ਤਮ ਹੁੰਦਾ');
     });
   });
 
@@ -456,25 +460,26 @@ describe('Milestone M2C: Shared Pagination PDF Integration', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // 7. Backward Compatibility: Legacy Export Fallback
+  // 7. Single Path: Unified Engine is the Sole Exporter Source
   // ---------------------------------------------------------------------------
-  describe('7. Backward Compatibility: Legacy Export Fallback', () => {
-    it('preserves legacy continuous body export when useUnifiedPagination is false or omitted', () => {
+  describe('7. Single Path: Unified Engine is the Sole Exporter Source', () => {
+    it('routes to unified discrete sheet generator regardless of useUnifiedPagination flag', () => {
       const blocks: ScreenplayBlock[] = [
         { id: 'sh1', type: 'scene_heading', text: 'EXT. STREET - DAY' },
         { id: 'act1', type: 'action', text: 'Walking down the road.' },
       ];
       const draft = createTestDraft(blocks);
 
-      const legacyHtml = generateScreenplayHtml(draft, sampleMetadata, {
+      const html = generateScreenplayHtml(draft, sampleMetadata, {
         paperSize: 'letter',
         includeTitlePage: false,
-        // useUnifiedPagination omitted
+        useUnifiedPagination: false, // Single path ensures unified engine is always used
+        ...defaultHeadlessOptions,
       });
 
-      // Legacy format contains .screenplay-body and does NOT contain .page-sheet
-      expect(legacyHtml).toContain('class="screenplay-body"');
-      expect(legacyHtml).not.toContain('class="page-sheet"');
+      // Unified format contains discrete .page-sheet containers
+      expect(html).toContain('class="page-sheet screenplay-page-sheet" data-page-number="1"');
+      expect(html).not.toContain('class="screenplay-body"');
     });
 
     it('routes to unified discrete sheet generator when useUnifiedPagination=true', () => {

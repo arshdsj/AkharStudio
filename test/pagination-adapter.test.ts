@@ -321,14 +321,14 @@ describe('Milestone M2A: Canonical Document Adapter & Position Resolver', () => 
     });
 
     it('3.2 extracts mid-block dialogue continuation split targets with (MORE) and (CONT\'D)', () => {
-      // 28-line action block fills slots 0..27 on page 1
-      // Character cue takes slot 29 (slot 28 is blank line above). Remaining slots = 6.
-      // 8-line dialogue block splits: 5 lines + (MORE) on page 1, 3 lines on page 2.
+      // 36-line action block fills slots 0..35 on page 1
+      // Character cue takes slot 37 (slot 36 is blank line above). Remaining slots = 5.
+      // 8-line dialogue block splits: 4 lines + (MORE) on page 1, 4 lines on page 2.
       const blocks: ScreenplayBlock[] = [
         {
           id: 'filler',
           type: 'action',
-          text: Array.from({ length: 28 }, (_, i) => `Filler line ${i + 1}`).join('\n'),
+          text: Array.from({ length: 36 }, (_, i) => `Filler line ${i + 1}`).join('\n'),
         },
         { id: 'char1', type: 'character', text: 'SURJIT' },
         {

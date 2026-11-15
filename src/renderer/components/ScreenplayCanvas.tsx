@@ -20,6 +20,9 @@ import {
   ContdSetting,
   HighlightCharactersSetting,
 } from '../../types/screenplay';
+import { PaginationResult, createPaginationEngine } from '../../core/layout/paginationEngine';
+import { draftToLayoutBlocks } from '../../core/layout/paginationAdapter';
+import { LINE_PITCH_PX } from '../../core/layout/screenplayGeometry';
 
 interface ScreenplayCanvasProps {
   draft: ScriptDraft;
@@ -45,6 +48,7 @@ interface ScreenplayCanvasProps {
   onDetectRomanPunjabiPaste?: (text: string) => void;
   useUnifiedPagination?: boolean;
   onPaginationEngineStatusChange?: (status: PaginationEngineStatus) => void;
+  onPaginationChange?: (result: PaginationResult) => void;
 }
 
 export const ScreenplayCanvas = React.forwardRef<ProseMirrorEditorHandle, ScreenplayCanvasProps>(
@@ -73,6 +77,7 @@ export const ScreenplayCanvas = React.forwardRef<ProseMirrorEditorHandle, Screen
       onDetectRomanPunjabiPaste,
       useUnifiedPagination = false,
       onPaginationEngineStatusChange,
+      onPaginationChange,
     },
     ref
   ) => {
@@ -140,6 +145,23 @@ export const ScreenplayCanvas = React.forwardRef<ProseMirrorEditorHandle, Screen
       },
     }));
 
+    const [paginationResult, setPaginationResult] = React.useState<PaginationResult | null>(() => {
+      try {
+        const layoutBlocks = draftToLayoutBlocks(draft);
+        if (layoutBlocks.length > 0) {
+          const eng = createPaginationEngine();
+          return eng.paginate(layoutBlocks, { paperSize, contdSetting });
+        }
+      } catch {
+        // fallback
+      }
+      return null;
+    });
+    const pageCount = Math.max(1, paginationResult?.pages.length || 1);
+    const isLetter = paperSize === 'letter';
+    const paperWidthPx = isLetter ? 816 : 793.7;
+    const paperHeightPx = isLetter ? 1056 : 1122.5;
+
     return (
       <div
         ref={containerRef}
@@ -160,53 +182,81 @@ export const ScreenplayCanvas = React.forwardRef<ProseMirrorEditorHandle, Screen
           onToggleExpand={onToggleTitlePageExpand}
         />
 
-        {/* Screenplay Paper Card (UI-01, PAGE-01, PAGE-03) */}
-        <div
-          className={`screenplay-paper ds-page select-text cursor-text shrink-0 ${
-            paperSize === 'letter' ? 'paper-letter' : 'paper-a4'
-          }`}
-          onClick={() => {
-            editorRef.current?.focus();
-          }}
-        >
-          {/* Page number at top right (PAGE-03: initial page counter 1.) */}
-          <div
-            className="absolute top-[0.5in] right-[1.0in] text-xs font-courier select-none"
-            style={{ color: 'var(--text-secondary)' }}
-          >
-            1.
+        {/* Screenplay Paper Container & Discrete Fixed-Size Page Boxes */}
+        <div className="screenplay-paper-wrapper relative flex flex-col items-center">
+          {/* Fixed-Size Page Boxes Layer (real paper height: 1056px Letter, 1122.5px A4) */}
+          <div className="screenplay-page-boxes-layer absolute top-0 left-0 right-0 pointer-events-none flex flex-col items-center">
+            {Array.from({ length: pageCount }).map((_, idx) => (
+              <div
+                key={idx}
+                className={`screenplay-page-box select-none shrink-0 ${
+                  paperSize === 'a4' ? 'paper-a4' : 'paper-letter'
+                }`}
+                data-page-number={idx + 1}
+                style={{
+                  width: `${paperWidthPx}px`,
+                  height: `${paperHeightPx}px`,
+                  marginBottom: idx < pageCount - 1 ? '36px' : '0px',
+                  background: 'var(--page-surface)',
+                  boxShadow:
+                    '0 4px 16px rgba(0, 0, 0, 0.45), 0 20px 56px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.07)',
+                  borderRadius: 'var(--radius-sm)',
+                  boxSizing: 'border-box',
+                }}
+              />
+            ))}
           </div>
 
-          {/* ProseMirror Core Screenplay Editor */}
-          <div className="script-content min-h-[8in] select-text cursor-text">
-            <ProseMirrorEditor
-              ref={editorRef}
-              key={draft.id}
-              draft={draft}
-              paperSize={paperSize}
-              onDraftChange={onDraftChange}
-              contdSetting={contdSetting}
-              inputMode={inputMode}
-              isVirtualKeyboardOpen={isVirtualKeyboardOpen}
-              onToggleVirtualKeyboard={onToggleVirtualKeyboard}
-              onShiftChange={onShiftChange}
-              onAltOrCtrlChange={onAltOrCtrlChange}
-              onTriggerContdPrompt={onTriggerContdPrompt}
-              onActiveBlockChange={(block) => {
-                onFocusTitle(false);
-                onFocusBlock(block);
-              }}
-              highlightCharacters={highlightCharacters}
-              isModalOpen={isModalOpen}
-              onSearchStateChange={onSearchStateChange}
-              onDetectRomanPunjabiPaste={onDetectRomanPunjabiPaste}
-              useUnifiedPagination={useUnifiedPagination}
-              onPaginationEngineStatusChange={onPaginationEngineStatusChange}
-              initialSelection={lastSelectionRef.current}
-              onSelectionChange={(sel) => {
-                lastSelectionRef.current = sel;
-              }}
-            />
+          {/* ProseMirror Screenplay Paper Editor */}
+          <div
+            className={`screenplay-paper ds-page select-text cursor-text shrink-0 relative z-10 ${
+              paperSize === 'letter' ? 'paper-letter' : 'paper-a4'
+            }`}
+            style={{
+              '--screenplay-line-pitch': `${LINE_PITCH_PX}px`,
+              background: 'transparent',
+              boxShadow: 'none',
+              borderRadius: 0,
+            } as React.CSSProperties}
+            onClick={() => {
+              editorRef.current?.focus();
+            }}
+          >
+            {/* ProseMirror Core Screenplay Editor */}
+            <div className="script-content min-h-[8in] select-text cursor-text">
+              <ProseMirrorEditor
+                ref={editorRef}
+                key={draft.id}
+                draft={draft}
+                paperSize={paperSize}
+                onDraftChange={onDraftChange}
+                contdSetting={contdSetting}
+                inputMode={inputMode}
+                isVirtualKeyboardOpen={isVirtualKeyboardOpen}
+                onToggleVirtualKeyboard={onToggleVirtualKeyboard}
+                onShiftChange={onShiftChange}
+                onAltOrCtrlChange={onAltOrCtrlChange}
+                onTriggerContdPrompt={onTriggerContdPrompt}
+                onActiveBlockChange={(block) => {
+                  onFocusTitle(false);
+                  onFocusBlock(block);
+                }}
+                highlightCharacters={highlightCharacters}
+                isModalOpen={isModalOpen}
+                onSearchStateChange={onSearchStateChange}
+                onDetectRomanPunjabiPaste={onDetectRomanPunjabiPaste}
+                useUnifiedPagination={useUnifiedPagination}
+                onPaginationEngineStatusChange={onPaginationEngineStatusChange}
+                onPaginationChange={(res) => {
+                  setPaginationResult(res);
+                  onPaginationChange?.(res);
+                }}
+                initialSelection={lastSelectionRef.current}
+                onSelectionChange={(sel) => {
+                  lastSelectionRef.current = sel;
+                }}
+              />
+            </div>
           </div>
         </div>
       </div>

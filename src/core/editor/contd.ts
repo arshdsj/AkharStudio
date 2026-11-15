@@ -80,7 +80,7 @@ export function getCharacterDisplayText(
   isEligible: boolean,
   contdSetting: ContdSetting
 ): string {
-  if (contdSetting !== 'on') {
+  if (contdSetting !== 'on' && contdSetting !== 'all') {
     return rawText;
   }
 

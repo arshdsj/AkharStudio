@@ -32,7 +32,12 @@ import {
   generateUnifiedScreenplayPdfHtml,
 } from '../src/core/export/pdfExporter';
 import { ScriptDraft, ScriptProject } from '../src/types/screenplay';
-import { createDefaultProject, getActiveDraft } from '../src/core/model/ProjectModel';
+import {
+  createDefaultProject,
+  getActiveDraft,
+  validateScriptProject,
+  migrateContdSetting,
+} from '../src/core/model/ProjectModel';
 import { draftToProseMirrorDoc, proseMirrorDocToDraft } from '../src/core/editor/documentAdapter';
 
 // In-memory mock localStorage for isolated testing
@@ -72,28 +77,28 @@ describe('Milestone M2E: Production Promotion & Settings', () => {
   // SECTION 1: Settings & Precedence Rules
   // ===========================================================================
   describe('1. Settings & Precedence Rules', () => {
-    it('defaults safely to Legacy when no setting exists in storage', () => {
+    it('defaults safely to Unified when no setting exists in storage', () => {
       expect(mockStorage.getItem(PAGINATION_SETTING_STORAGE_KEY)).toBeNull();
       const resolved = getStoredPaginationEngine();
-      expect(resolved).toBe('legacy');
-      expect(DEFAULT_PAGINATION_ENGINE).toBe('legacy');
+      expect(resolved).toBe('unified');
+      expect(DEFAULT_PAGINATION_ENGINE).toBe('unified');
     });
 
-    it('defaults safely to Legacy when storage contains invalid or corrupted values', () => {
+    it('defaults safely to Unified when storage contains invalid or corrupted values', () => {
       mockStorage.setItem(PAGINATION_SETTING_STORAGE_KEY, 'invalid_mode');
-      expect(getStoredPaginationEngine()).toBe('legacy');
+      expect(getStoredPaginationEngine()).toBe('unified');
 
       mockStorage.setItem(PAGINATION_SETTING_STORAGE_KEY, '');
-      expect(getStoredPaginationEngine()).toBe('legacy');
+      expect(getStoredPaginationEngine()).toBe('unified');
 
       mockStorage.setItem(PAGINATION_SETTING_STORAGE_KEY, 'undefined');
-      expect(getStoredPaginationEngine()).toBe('legacy');
+      expect(getStoredPaginationEngine()).toBe('unified');
     });
 
-    it('persists and restores saved Legacy preference', () => {
-      setStoredPaginationEngine('legacy');
-      expect(mockStorage.getItem(PAGINATION_SETTING_STORAGE_KEY)).toBe('legacy');
-      expect(getStoredPaginationEngine()).toBe('legacy');
+    it('migrates stored Legacy preference to Unified in localStorage', () => {
+      mockStorage.setItem(PAGINATION_SETTING_STORAGE_KEY, 'legacy');
+      expect(getStoredPaginationEngine()).toBe('unified');
+      expect(mockStorage.getItem(PAGINATION_SETTING_STORAGE_KEY)).toBe('unified');
     });
 
     it('persists and restores saved Unified preference', () => {
@@ -110,24 +115,16 @@ describe('Milestone M2E: Production Promotion & Settings', () => {
       warnSpy.mockRestore();
     });
 
-    it('gives saved user preference precedence over development environment override', () => {
-      // User saved Legacy in UI
-      setStoredPaginationEngine('legacy');
-
-      // Dev flag active in environment
+    it('preserves Unified as the canonical engine when dev flag is active', () => {
       process.env.AKHAR_USE_UNIFIED_PAGINATION = '1';
-
-      // Saved preference MUST win so dev flags don't override user choices
       const resolved = getStoredPaginationEngine();
-      expect(resolved).toBe('legacy');
+      expect(resolved).toBe('unified');
     });
 
-    it('gives saved user preference precedence over window global override', () => {
-      setStoredPaginationEngine('legacy');
+    it('preserves Unified as the canonical engine when window global override is present', () => {
       (window as unknown as { __AKHAR_USE_UNIFIED_PAGINATION__?: boolean }).__AKHAR_USE_UNIFIED_PAGINATION__ = true;
-
       const resolved = getStoredPaginationEngine();
-      expect(resolved).toBe('legacy');
+      expect(resolved).toBe('unified');
     });
 
     it('activates Unified when dev override is present and no user preference is saved', () => {
@@ -511,7 +508,7 @@ describe('Milestone M2E: Production Promotion & Settings', () => {
   // SECTION 4: Editor & PDF Export Parity by Mode
   // ===========================================================================
   describe('4. Editor & PDF Export Parity by Mode', () => {
-    it('generates legacy HTML export when useUnifiedPagination is false', () => {
+    it('routes to unified discrete sheet generator even when useUnifiedPagination is false (Single Path)', () => {
       const project: ScriptProject = createDefaultProject();
       const draft = getActiveDraft(project);
       draft.blocks = [
@@ -523,13 +520,12 @@ describe('Milestone M2E: Production Promotion & Settings', () => {
         paperSize: 'letter',
         includeTitlePage: false,
         useUnifiedPagination: false,
+        allowHeadlessFallback: true,
       });
 
-      expect(html).toContain('class="screenplay-body"');
+      expect(html).toContain('screenplay-page-sheet');
       expect(html).toContain('1. INT. AMRITSAR - DAY');
       expect(html).toContain('ਪਵਨ ਆਪਣੇ ਕੰਮ ਵਿੱਚ ਮਗਨ ਹੈ।');
-      // Legacy exporter uses continuous div without slot-line DOM
-      expect(html).not.toContain('class="slot-line"');
     });
 
     it('generates unified HTML export when useUnifiedPagination is true', () => {
@@ -620,6 +616,49 @@ describe('Milestone M2E: Production Promotion & Settings', () => {
 
       const blocksAfter = JSON.stringify(draft.blocks);
       expect(blocksAfter).toBe(blocksBefore);
+    });
+  });
+
+  describe('5. ContdSetting Migration for Saved Projects', () => {
+    it('migrates legacy contdSetting "on" to "both"', () => {
+      const legacyProject = createDefaultProject();
+      (legacyProject.settings as any).contdSetting = 'on';
+
+      const validated = validateScriptProject(legacyProject);
+      expect(validated.settings.contdSetting).toBe('both');
+    });
+
+    it('migrates legacy contdSetting "off" to "more_only" (matching legacy engine behavior)', () => {
+      const legacyProject = createDefaultProject();
+      (legacyProject.settings as any).contdSetting = 'off';
+
+      const validated = validateScriptProject(legacyProject);
+      expect(validated.settings.contdSetting).toBe('more_only');
+    });
+
+    it('migrates legacy contdSetting "unasked" to "none"', () => {
+      const legacyProject = createDefaultProject();
+      (legacyProject.settings as any).contdSetting = 'unasked';
+
+      const validated = validateScriptProject(legacyProject);
+      expect(validated.settings.contdSetting).toBe('none');
+    });
+
+    it('preserves modern non-overlapping contdSetting values untouched', () => {
+      for (const val of ['none', 'more_only', 'contd_only', 'both', 'reprint_name'] as const) {
+        const project = createDefaultProject();
+        project.settings.contdSetting = val;
+
+        const validated = validateScriptProject(project);
+        expect(validated.settings.contdSetting).toBe(val);
+      }
+    });
+
+    it('migrateContdSetting handles invalid or undefined inputs safely', () => {
+      expect(migrateContdSetting(undefined)).toBe('none');
+      expect(migrateContdSetting(null)).toBe('none');
+      expect(migrateContdSetting('invalid_value')).toBe('none');
+      expect(migrateContdSetting('all')).toBe('both');
     });
   });
 });

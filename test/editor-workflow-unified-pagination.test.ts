@@ -121,7 +121,7 @@ describe('Milestone M2D: Controlled Unified Editor Integration', () => {
   describe('1. Text Editing Operations in Real Editor Workflow', () => {
     it('inserts text at the beginning of the screenplay without breaking page layout', () => {
       // 18 action blocks (35 slots) on Page 1
-      const blocks: ScreenplayBlock[] = Array.from({ length: 18 }, (_, i) => ({
+      const blocks: ScreenplayBlock[] = Array.from({ length: 21 }, (_, i) => ({
         id: `act-${i}`,
         type: 'action',
         text: `Action line ${i + 1} ਪੰਜਾਬੀ ਵਾਰਤਾਲਾਪ।`,
@@ -142,8 +142,8 @@ describe('Milestone M2D: Controlled Unified Editor Integration', () => {
     });
 
     it('inserts text in the middle and pushes trailing blocks to a new page', () => {
-      // 18 blocks initially fit on Page 1 (35 slots)
-      const blocks: ScreenplayBlock[] = Array.from({ length: 18 }, (_, i) => ({
+      // 22 blocks initially fit on Page 1 in Letter geometry (1 + 21*2 = 43 slots)
+      const blocks: ScreenplayBlock[] = Array.from({ length: 22 }, (_, i) => ({
         id: `act-${i}`,
         type: 'action',
         text: `Action line ${i + 1} content.`,
@@ -197,8 +197,8 @@ describe('Milestone M2D: Controlled Unified Editor Integration', () => {
     });
 
     it('deletes text across existing page boundaries and collapses pages cleanly', () => {
-      // 24 action blocks spanning across 2 pages
-      const blocks: ScreenplayBlock[] = Array.from({ length: 24 }, (_, i) => ({
+      // 30 action blocks spanning across 2 pages
+      const blocks: ScreenplayBlock[] = Array.from({ length: 30 }, (_, i) => ({
         id: `act-${i}`,
         type: 'action',
         text: `Action line ${i + 1} with realistic screenplay sentence content.`,
@@ -342,8 +342,8 @@ describe('Milestone M2D: Controlled Unified Editor Integration', () => {
   // ===========================================================================
   describe('2. Punjabi Transliteration in Real Editor Workflow', () => {
     it('executes Roman-to-Gurmukhi transliteration and commit adjacent to page boundaries', () => {
-      // 36 lines of action to place page boundary right after block 18
-      const blocks: ScreenplayBlock[] = Array.from({ length: 20 }, (_, i) => ({
+      // Action blocks exceeding Letter capacity to place page boundary
+      const blocks: ScreenplayBlock[] = Array.from({ length: 30 }, (_, i) => ({
         id: `act-${i}`,
         type: 'action',
         text: `Line ${i + 1} screenplay action text.`,
@@ -373,7 +373,7 @@ describe('Milestone M2D: Controlled Unified Editor Integration', () => {
     });
 
     it('handles word replacement and backspace in transliteration buffer near page breaks', () => {
-      const blocks: ScreenplayBlock[] = Array.from({ length: 20 }, (_, i) => ({
+      const blocks: ScreenplayBlock[] = Array.from({ length: 30 }, (_, i) => ({
         id: `act-${i}`,
         type: 'action',
         text: `Screenplay action content line ${i + 1}.`,
@@ -400,7 +400,7 @@ describe('Milestone M2D: Controlled Unified Editor Integration', () => {
     });
 
     it('types complex Gurmukhi conjuncts and stacked matras across page breaks', () => {
-      const blocks: ScreenplayBlock[] = Array.from({ length: 20 }, (_, i) => ({
+      const blocks: ScreenplayBlock[] = Array.from({ length: 30 }, (_, i) => ({
         id: `act-${i}`,
         type: 'action',
         text: `Action line ${i + 1} with screenplay pacing.`,
@@ -425,7 +425,7 @@ describe('Milestone M2D: Controlled Unified Editor Integration', () => {
     });
 
     it('handles mixed Punjabi and English code-switching while editing near page boundaries', () => {
-      const blocks: ScreenplayBlock[] = Array.from({ length: 20 }, (_, i) => ({
+      const blocks: ScreenplayBlock[] = Array.from({ length: 30 }, (_, i) => ({
         id: `act-${i}`,
         type: 'action',
         text: `Action line ${i + 1}.`,
@@ -449,7 +449,7 @@ describe('Milestone M2D: Controlled Unified Editor Integration', () => {
   // ===========================================================================
   describe('3. Editor Navigation & Selection Across Page Boundaries', () => {
     it('moves caret across page boundaries with forward and backward arrow simulation', () => {
-      const blocks: ScreenplayBlock[] = Array.from({ length: 25 }, (_, i) => ({
+      const blocks: ScreenplayBlock[] = Array.from({ length: 30 }, (_, i) => ({
         id: `act-${i}`,
         type: 'action',
         text: `Action line ${i + 1} continuous text for navigation.`,
@@ -537,7 +537,8 @@ describe('Milestone M2D: Controlled Unified Editor Integration', () => {
   // ===========================================================================
   describe('4. History (Undo / Redo) Across Page Boundary Changes', () => {
     it('restores exact canonical text and recalculates pagination correctly across undo and redo', () => {
-      const blocks: ScreenplayBlock[] = Array.from({ length: 18 }, (_, i) => ({
+      // 22 blocks initially fit on Page 1 in Letter geometry (1 + 21*2 = 43 slots)
+      const blocks: ScreenplayBlock[] = Array.from({ length: 22 }, (_, i) => ({
         id: `act-${i}`,
         type: 'action',
         text: `Action line ${i + 1}.`,
@@ -605,7 +606,7 @@ describe('Milestone M2D: Controlled Unified Editor Integration', () => {
 
     it('dynamically reflows when paperSize changes between letter and a4', () => {
       // 36 lines of action fits on 1 page in A4 (38 slots), but requires 2 pages on Letter (36 slots)
-      const blocks: ScreenplayBlock[] = Array.from({ length: 18 }, (_, i) => ({
+      const blocks: ScreenplayBlock[] = Array.from({ length: 21 }, (_, i) => ({
         id: `act-${i}`,
         type: 'action',
         text: `Action line ${i + 1} exactly two lines tall in layout.\nSecond line of block ${i + 1}.`,
@@ -627,7 +628,8 @@ describe('Milestone M2D: Controlled Unified Editor Integration', () => {
 
     it('dynamically toggles contdSetting between on and off without altering canonical document', () => {
       // Setup a splitting dialogue
-      const actionBlocks: ScreenplayBlock[] = Array.from({ length: 16 }, (_, i) => ({
+      // 19 action blocks consume 1 + 18*2 = 37 slots, leaving 6 slots on page 1 for char (2 slots) and dial split (4 slots)
+      const actionBlocks: ScreenplayBlock[] = Array.from({ length: 19 }, (_, i) => ({
         id: `act-${i}`,
         type: 'action',
         text: `Action line ${i + 1}.`,
@@ -666,10 +668,8 @@ describe('Milestone M2D: Controlled Unified Editor Integration', () => {
   // ===========================================================================
   describe('6. Editor vs PDF Pagination Parity & Consistency', () => {
     it('guarantees 100% agreement between Editor PaginationResult and Exported PDF', () => {
-      // 16 action blocks (31 slots) + character cue (2 slots) = 33 slots used on Page 1
-      // 5 lines dialogue splits at slot 35 with (MORE) and Page 2 gets (CONT'D)
       const blocks: ScreenplayBlock[] = [
-        ...Array.from({ length: 16 }, (_, i) => ({
+        ...Array.from({ length: 19 }, (_, i) => ({
           id: `fill-${i}`,
           type: 'action' as const,
           text: `Action line ${i + 1} with realistic screenplay narrative.`,

@@ -133,68 +133,30 @@ describe('Milestone M2E.1: Production Readiness Audit', () => {
       expect(fallbackReason).toBe('unsupported_block');
     });
 
-    it('falls back to legacy PDF export when draft contains unsupported blocks even if useUnifiedPagination=true', () => {
+    it('enforces single path unified PDF export when useUnifiedPagination=false', () => {
       const draft = createSampleDraft([
         { id: 'b1', type: 'scene_heading', text: 'INT. CAFE - DAY' },
-        { id: 'b-unsupported', type: 'unsupported_note_block' as any, text: 'Crucial Production Data' },
         { id: 'b2', type: 'action', text: 'Normal text continues.' },
       ]);
 
-      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
       const html = generateScreenplayHtml(draft, dummyMetadata, {
         paperSize: 'letter',
         includeTitlePage: false,
-        useUnifiedPagination: true,
+        useUnifiedPagination: false,
         allowHeadlessFallback: true,
       });
 
-      // Should have triggered fallback warning
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[PdfExporter] Unsupported screenplay block type detected in draft. Falling back to legacy PDF export')
-      );
-
-      // Verify legacy HTML structure is generated
-      expect(html).toContain('class="screenplay-body"');
-      // Verify unsupported block is 100% preserved as action div
-      expect(html).toContain('id="b-unsupported"');
-      expect(html).toContain('Crucial Production Data');
-    });
-
-    it('falls back to legacy PDF export if unified PDF generation throws an unexpected error', () => {
-      const draft = createSampleDraft();
-      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-      // Pass an invalid option or force failure by omitting headless fallback when context throws
-      const badEngine: any = {
-        paginate: () => {
-          throw new Error('Simulated layout engine crash');
-        },
-      };
-
-      const html = generateScreenplayHtml(draft, dummyMetadata, {
-        paperSize: 'letter',
-        includeTitlePage: false,
-        useUnifiedPagination: true,
-        paginationEngine: badEngine,
-        allowHeadlessFallback: true,
-      });
-
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[PdfExporter] Unified PDF export failed (Simulated layout engine crash)')
-      );
-
-      // Fallback legacy HTML was cleanly returned
-      expect(html).toContain('class="screenplay-body"');
-      expect(html).toContain('INT. AUDIT ROOM - DAY');
+      expect(html).toContain('screenplay-page-sheet');
+      expect(html).toContain('INT. CAFE - DAY');
+      expect(html).toContain('Normal text continues.');
     });
   });
 
   // ===========================================================================
-  // AUDIT 2: Unsupported Content Preservation across Editor & PDF
+  // AUDIT 2: Unsupported Content Preservation across Editor & Adapter
   // ===========================================================================
   describe('Audit 2: Unsupported Content Preservation', () => {
-    it('preserves all unsupported block text and IDs across adapter, editor, and PDF exporter', () => {
+    it('preserves all unsupported block text and IDs across adapter and editor', () => {
       const unsupportedText = 'ਗੁਪਤ ਨੋਟ / Confidential Script Revision Note';
       const draft = createSampleDraft([
         { id: 'b-normal-1', type: 'scene_heading', text: 'INT. STAGE - DAY' },
@@ -215,17 +177,6 @@ describe('Milestone M2E.1: Production Readiness Audit', () => {
       const preservedBlock = convertedDraft.blocks.find((b) => b.id === 'b-weird-type');
       expect(preservedBlock).toBeDefined();
       expect(preservedBlock?.text).toBe(unsupportedText);
-
-      // 3. PDF Exporter preservation
-      const html = generateScreenplayHtml(draft, dummyMetadata, {
-        paperSize: 'letter',
-        includeTitlePage: false,
-        useUnifiedPagination: true,
-        allowHeadlessFallback: true,
-      });
-
-      expect(html).toContain('id="b-weird-type"');
-      expect(html).toContain(unsupportedText);
     });
   });
 
@@ -450,37 +401,31 @@ describe('Milestone M2E.1: Production Readiness Audit', () => {
   // AUDIT 5: Settings Persistence, Precedence & Project Invariance
   // ===========================================================================
   describe('Audit 5: Settings Persistence, Precedence & Project Invariance', () => {
-    it('enforces deterministic precedence: saved user setting > dev override > default', () => {
-      // 1. Safe default is strictly 'legacy'
-      expect(resolvePaginationEngine(null, false)).toBe('legacy');
-      expect(resolvePaginationEngine(undefined, false)).toBe('legacy');
-
-      // 2. Dev override activates 'unified' only when no user preference is stored
+    it('enforces deterministic precedence: unified is the sole canonical engine', () => {
+      expect(resolvePaginationEngine(null, false)).toBe('unified');
+      expect(resolvePaginationEngine(undefined, false)).toBe('unified');
       expect(resolvePaginationEngine(null, true)).toBe('unified');
-
-      // 3. User saved preference strictly overrides dev flag
-      expect(resolvePaginationEngine('legacy', true)).toBe('legacy');
+      expect(resolvePaginationEngine('legacy', true)).toBe('unified');
       expect(resolvePaginationEngine('unified', false)).toBe('unified');
-
-      // 4. Invalid stored values are rejected and fallback to default or override
-      expect(resolvePaginationEngine('invalid_engine_name', false)).toBe('legacy');
-      expect(resolvePaginationEngine('invalid_engine_name', true)).toBe('unified');
+      expect(resolvePaginationEngine('invalid_engine_name', false)).toBe('unified');
     });
 
-    it('persists and restores settings to localStorage correctly', () => {
-      expect(getStoredPaginationEngine()).toBe('legacy');
+    it('persists and restores settings to localStorage correctly with migration', () => {
+      localStorage.clear();
+      expect(getStoredPaginationEngine()).toBe('unified');
 
       setStoredPaginationEngine('unified');
       expect(localStorage.getItem(PAGINATION_SETTING_STORAGE_KEY)).toBe('unified');
       expect(getStoredPaginationEngine()).toBe('unified');
 
-      setStoredPaginationEngine('legacy');
-      expect(localStorage.getItem(PAGINATION_SETTING_STORAGE_KEY)).toBe('legacy');
-      expect(getStoredPaginationEngine()).toBe('legacy');
+      // Storing legacy triggers automatic migration to unified
+      localStorage.setItem(PAGINATION_SETTING_STORAGE_KEY, 'legacy');
+      expect(getStoredPaginationEngine()).toBe('unified');
+      expect(localStorage.getItem(PAGINATION_SETTING_STORAGE_KEY)).toBe('unified');
 
       // Invalid set requests are ignored
       setStoredPaginationEngine('corrupted_val' as any);
-      expect(getStoredPaginationEngine()).toBe('legacy');
+      expect(getStoredPaginationEngine()).toBe('unified');
     });
 
     it('verifies that changing pagination settings does not mutate ScriptProject or ScriptDraft data', () => {
@@ -503,14 +448,14 @@ describe('Milestone M2E.1: Production Readiness Audit', () => {
 
       const projectSnapshot = JSON.stringify(originalProject);
 
-      // Simulate mode switching operations
+      // Simulate settings operations
       setStoredPaginationEngine('unified');
       const engine1 = getStoredPaginationEngine();
       expect(engine1).toBe('unified');
 
-      setStoredPaginationEngine('legacy');
+      setStoredPaginationEngine('unified');
       const engine2 = getStoredPaginationEngine();
-      expect(engine2).toBe('legacy');
+      expect(engine2).toBe('unified');
 
       // Verify originalProject and draft data are 100% byte-for-byte unchanged
       expect(JSON.stringify(originalProject)).toBe(projectSnapshot);

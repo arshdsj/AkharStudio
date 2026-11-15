@@ -80,8 +80,6 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   onSceneSwitch,
   theme = 'dark',
   onThemeChange,
-  paginationEngine = 'legacy',
-  onPaginationEngineChange,
 }) => {
   const [activeTab, setActiveTab] = useState<'tools' | 'scenes' | 'settings'>('tools');
 
@@ -229,15 +227,17 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
           <section className="ds-section">
             <h3 className="ds-section__title">Formatting</h3>
             <div className="ds-field">
-              <span className="ds-label">Dialogue continuation (CONT&apos;D)</span>
+              <span className="ds-label">Dialogue split markers</span>
               <select
                 value={contdSetting}
                 onChange={(e) => onContdSettingChange(e.target.value as ContdSetting)}
                 className="ds-select"
               >
-                <option value="unasked">Prompt when needed</option>
-                <option value="on">Always</option>
-                <option value="off">Never</option>
+                <option value="none">None (clean split, default)</option>
+                <option value="more_only">More only ((MORE) at bottom)</option>
+                <option value="contd_only">Cont&apos;d only ((CONT&apos;D) at top)</option>
+                <option value="both">Both ((MORE) and (CONT&apos;D))</option>
+                <option value="reprint_name">Reprint speaker name (without (CONT&apos;D))</option>
               </select>
             </div>
 
@@ -408,39 +408,6 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
               </div>
               <p className="ds-help">
                 US Letter (8.5 &times; 11 in) is standard for North American screenplays; A4 (210 &times; 297 mm) is standard internationally.
-              </p>
-            </div>
-          </section>
-
-          {/* Pagination Engine (Milestone M2E) */}
-          <section className="ds-section">
-            <h3 className="ds-section__title">Pagination Engine</h3>
-            <div className="ds-field">
-              <span className="ds-label">Layout &amp; page calculation</span>
-              <div className="ds-seg" role="radiogroup" aria-label="Pagination engine" data-pagination-control>
-                <button
-                  type="button"
-                  className="ds-seg__item"
-                  role="radio"
-                  aria-checked={paginationEngine === 'legacy'}
-                  onClick={() => onPaginationEngineChange?.('legacy')}
-                  data-pagination-value="legacy"
-                >
-                  Legacy
-                </button>
-                <button
-                  type="button"
-                  className="ds-seg__item"
-                  role="radio"
-                  aria-checked={paginationEngine === 'unified'}
-                  onClick={() => onPaginationEngineChange?.('unified')}
-                  data-pagination-value="unified"
-                >
-                  Unified
-                </button>
-              </div>
-              <p className="ds-help">
-                Legacy uses fast line-count estimation (recommended for compatibility during rollout). Unified uses pure typographic font metrics, accurate Punjabi line-wrapping, and shared PDF parity.
               </p>
             </div>
           </section>

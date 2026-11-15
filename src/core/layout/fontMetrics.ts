@@ -15,6 +15,9 @@
  * evaluated by the downstream Pagination Engine (M1C).
  */
 
+import { CANONICAL_FONT_STACK } from './screenplayGeometry';
+export { CANONICAL_FONT_STACK };
+
 // -----------------------------------------------------------------------------
 // Type Definitions
 // -----------------------------------------------------------------------------
@@ -85,6 +88,7 @@ export interface IFontMetricsProvider {
   getStatus(): RuntimeFontStatus;
   measureWidth(text: string, fontSizePt?: number, bold?: boolean, italic?: boolean): number;
   getLineBoxMetrics(fontSizePt?: number): LineBoxMetrics;
+  getLineBoxMetricsForText?(text: string, fontSizePt?: number): LineBoxMetrics;
 }
 
 // -----------------------------------------------------------------------------
@@ -465,7 +469,7 @@ export class FontMetricsProvider implements IFontMetricsProvider {
       const testString = 'ਕ੍ਰਿੱਪਾ ਸ੍ਰੀ ਗੁੰਝਲ਼';
       const sizePx = 16; // 12pt
 
-      ctx.font = `normal normal ${sizePx}px "${this.family}", sans-serif`;
+      ctx.font = `normal normal ${sizePx}px ${CANONICAL_FONT_STACK}`;
       const targetWidth = ctx.measureText(testString).width;
 
       ctx.font = `normal normal ${sizePx}px "__AkharNonExistentFallbackFont__", monospace`;
@@ -531,7 +535,10 @@ export class FontMetricsProvider implements IFontMetricsProvider {
     const weight = bold ? 'bold ' : 'normal ';
     const style = italic ? 'italic ' : 'normal ';
     const sizePx = pointsToPixels(fontSizePt);
-    ctx.font = `${style}${weight}${sizePx}px "${this.family}", sans-serif`;
+    const fontStack = this.family === EXPECTED_NOTO_SANS_GURMUKHI.family || this.family === EXPECTED_COURIER_PRIME.family
+      ? CANONICAL_FONT_STACK
+      : `"${this.family}", ${CANONICAL_FONT_STACK}`;
+    ctx.font = `${style}${weight}${sizePx}px ${fontStack}`;
 
     const metrics = ctx.measureText(text);
     const widthPx = metrics.width;
@@ -589,6 +596,40 @@ export class FontMetricsProvider implements IFontMetricsProvider {
       lineBoxHeightPt,
       actualAscentPt,
       actualDescentPt,
+    };
+  }
+
+  /**
+   * Reports line-box metrics considering the scripts actually present in the text line.
+   * If Gurmukhi glyphs are present, returns the maximum font box of Noto Sans Gurmukhi and Courier Prime.
+   * If only Latin / ASCII glyphs are present, returns Courier Prime line box metrics.
+   */
+  public getLineBoxMetricsForText(text: string, fontSizePt = 12): LineBoxMetrics {
+    const hasGurmukhi = /[\u0A00-\u0A7F]/.test(text);
+    const emNoto = EXPECTED_NOTO_SANS_GURMUKHI.unitsPerEm || 1000;
+    const notoAscent = ((EXPECTED_NOTO_SANS_GURMUKHI.yMax || 995) / emNoto) * fontSizePt;
+    const notoDescent = (Math.abs(EXPECTED_NOTO_SANS_GURMUKHI.yMin || -398) / emNoto) * fontSizePt;
+    const notoHeight = notoAscent + notoDescent;
+
+    const emCourier = EXPECTED_COURIER_PRIME.unitsPerEm || 2048;
+    const courierAscent = ((EXPECTED_COURIER_PRIME.yMax || 1827) / emCourier) * fontSizePt;
+    const courierDescent = (Math.abs(EXPECTED_COURIER_PRIME.yMin || -526) / emCourier) * fontSizePt;
+    const courierHeight = courierAscent + courierDescent;
+
+    if (hasGurmukhi) {
+      return {
+        fontSizePt,
+        ascentPt: Number(Math.max(notoAscent, courierAscent).toFixed(4)),
+        descentPt: Number(Math.max(notoDescent, courierDescent).toFixed(4)),
+        lineBoxHeightPt: Number(Math.max(notoHeight, courierHeight).toFixed(4)),
+      };
+    }
+
+    return {
+      fontSizePt,
+      ascentPt: Number(courierAscent.toFixed(4)),
+      descentPt: Number(courierDescent.toFixed(4)),
+      lineBoxHeightPt: Number(courierHeight.toFixed(4)),
     };
   }
 

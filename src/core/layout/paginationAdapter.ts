@@ -43,6 +43,31 @@ export interface AdapterDiagnostic {
   offset?: number;
 }
 
+export interface TextMarkRun {
+  /** 0-based character start offset within block textContent */
+  start: number;
+  /** 0-based character end offset within block textContent */
+  end: number;
+  /** Whether bold/strong mark is present */
+  bold: boolean;
+  /** Whether italic/em mark is present */
+  italic: boolean;
+  /** Whether underline mark is present */
+  underline?: boolean;
+}
+
+export function computeMarksHash(markRuns?: TextMarkRun[]): string {
+  if (!markRuns || markRuns.length === 0) return '0';
+  const styledRuns = markRuns.filter((r) => r.bold || r.italic || r.underline);
+  if (styledRuns.length === 0) return '0';
+  return styledRuns
+    .map((r) => {
+      const flags = `${r.bold ? 'B' : ''}${r.italic ? 'I' : ''}${r.underline ? 'U' : ''}`;
+      return `${r.start}-${r.end}:${flags}`;
+    })
+    .join(';');
+}
+
 export interface BlockPositionInfo {
   /** Canonical block ID. */
   blockId: string;
@@ -64,6 +89,10 @@ export interface BlockPositionInfo {
   text: string;
   /** Character speaker name if block is a character cue. */
   characterName?: string;
+  /** Inline mark runs across inline text spans in this block */
+  markRuns?: TextMarkRun[];
+  /** Canonical hash string representing all mark runs in this block */
+  marksHash?: string;
   /** Whether the block has a recognized and supported screenplay block type. */
   isSupportedType: boolean;
   /** Raw unmapped type string from document attribute if unsupported. */
@@ -117,6 +146,8 @@ export interface PageBreakDecorationTarget {
   moreText?: string;
   /** Optional (CONT'D) presentation text for the continuing speaker on next page. */
   contdText?: string;
+  /** Dynamic bottom spacer height in CSS px (remainder of previous page + bottom margin). */
+  bottomSpacerPx?: number;
 }
 
 // -----------------------------------------------------------------------------
@@ -183,6 +214,8 @@ export function docToLayoutBlocks(doc: PMNode): {
       type: b.blockType,
       text: b.text,
       characterName: b.characterName,
+      markRuns: b.markRuns,
+      marksHash: b.marksHash,
     }));
 
   return { layoutBlocks, positionMap, diagnostics: positionMap.diagnostics };
@@ -231,6 +264,26 @@ export function buildProseMirrorPositionMap(doc: PMNode): ProseMirrorPositionMap
       const characterName =
         blockType === 'character' ? normalizeCharacterName(text) || text.trim() : undefined;
 
+      let charOffset = 0;
+      const markRuns: TextMarkRun[] = [];
+      node.forEach((child) => {
+        if (child.isText && child.text) {
+          const len = child.text.length;
+          const isBold = child.marks.some((m) => m.type.name === 'bold' || m.type.name === 'strong');
+          const isItalic = child.marks.some((m) => m.type.name === 'italic' || m.type.name === 'em');
+          const isUnderline = child.marks.some((m) => m.type.name === 'underline');
+          markRuns.push({
+            start: charOffset,
+            end: charOffset + len,
+            bold: isBold,
+            italic: isItalic,
+            underline: isUnderline,
+          });
+          charOffset += len;
+        }
+      });
+      const marksHash = computeMarksHash(markRuns);
+
       const info: BlockPositionInfo = {
         blockId,
         blockType,
@@ -242,6 +295,8 @@ export function buildProseMirrorPositionMap(doc: PMNode): ProseMirrorPositionMap
         textLength,
         text,
         characterName,
+        markRuns,
+        marksHash,
         isSupportedType,
         rawType,
       };
@@ -320,39 +375,48 @@ export function extractPageBreakTargets(
     const firstSlot = page.slots[0];
     if (!firstSlot) continue;
 
-    // Check if the previous page ended with a presentation (MORE)
+    // Calculate exact bottom spacer height to fill remaining body slots + safety buffer + bottom margin
+    const remainingSlots = Math.max(0, prevPage.remainingSlots ?? (prevPage.profile.slotCapacity - prevPage.usedSlots));
+    const bottomBufferPx = prevPage.profile.bottomSafetyBufferPt * (96 / 72);
+    const bottomMarginPx = prevPage.profile.marginBottomPt * (96 / 72);
+    const linePitchPx = prevPage.profile.linePitchPt * (96 / 72);
+    const bottomSpacerPx = remainingSlots * linePitchPx + bottomBufferPx + bottomMarginPx;
+
+    // Check if dialogue was split across page boundaries
     const prevLastSlot = prevPage.slots[prevPage.slots.length - 1];
-    const isDialogueSplit = prevLastSlot && prevLastSlot.kind === 'more';
+    const prevTextSlots = prevPage.slots.filter((s) => s.kind === 'text');
+    const lastTextSlot = prevTextSlots[prevTextSlots.length - 1];
+    const firstTextSlot = page.slots.find((s) => s.kind === 'text' && !s.isPresentationOnly);
+    const contdSlot = page.slots.find((s) => s.kind === 'contd');
 
-    if (isDialogueSplit) {
-      // Find the continuing dialogue line on the new page
-      const dialogueSlot = page.slots.find((s) => s.kind === 'text' && !s.isPresentationOnly);
-      const contdSlot = page.slots.find((s) => s.kind === 'contd');
+    const isDialogueSplit =
+      (prevLastSlot && prevLastSlot.kind === 'more') ||
+      (lastTextSlot && firstTextSlot && lastTextSlot.blockId === firstTextSlot.blockId && firstTextSlot.blockType === 'dialogue');
 
-      if (dialogueSlot && dialogueSlot.sourceStartOffset !== undefined) {
-        const block = positionMap.getBlock(dialogueSlot.blockId);
-        if (block) {
-          if (!isSafeGraphemeBoundary(block.text, dialogueSlot.sourceStartOffset)) {
-            positionMap.diagnostics.push({
-              level: 'warning',
-              code: 'INVALID_SPLIT_OFFSET',
-              blockId: block.blockId,
-              message: `Dialogue split offset ${dialogueSlot.sourceStartOffset} in block '${block.blockId}' is not on a safe Unicode grapheme boundary.`,
-              offset: dialogueSlot.sourceStartOffset,
-            });
-          }
-          const pmPos = positionMap.pmPosFromOffset(dialogueSlot.blockId, dialogueSlot.sourceStartOffset);
-          targets.push({
-            pageNumber: page.pageNumber,
-            pmPos,
-            breakType: 'mid_block',
-            blockId: dialogueSlot.blockId,
-            textOffset: dialogueSlot.sourceStartOffset,
-            moreText: prevLastSlot.presentationText,
-            contdText: contdSlot?.presentationText,
+    if (isDialogueSplit && firstTextSlot && firstTextSlot.sourceStartOffset !== undefined && firstTextSlot.sourceStartOffset > 0) {
+      const block = positionMap.getBlock(firstTextSlot.blockId);
+      if (block) {
+        if (!isSafeGraphemeBoundary(block.text, firstTextSlot.sourceStartOffset)) {
+          positionMap.diagnostics.push({
+            level: 'warning',
+            code: 'INVALID_SPLIT_OFFSET',
+            blockId: block.blockId,
+            message: `Dialogue split offset ${firstTextSlot.sourceStartOffset} in block '${block.blockId}' is not on a safe Unicode grapheme boundary.`,
+            offset: firstTextSlot.sourceStartOffset,
           });
-          continue;
         }
+        const pmPos = positionMap.pmPosFromOffset(firstTextSlot.blockId, firstTextSlot.sourceStartOffset);
+        targets.push({
+          pageNumber: page.pageNumber,
+          pmPos,
+          breakType: 'mid_block',
+          blockId: firstTextSlot.blockId,
+          textOffset: firstTextSlot.sourceStartOffset,
+          moreText: prevLastSlot?.kind === 'more' ? prevLastSlot.presentationText : undefined,
+          contdText: contdSlot?.presentationText,
+          bottomSpacerPx,
+        });
+        continue;
       }
     }
 
@@ -383,6 +447,7 @@ export function extractPageBreakTargets(
         breakType: 'mid_block',
         blockId: targetSlot.blockId,
         textOffset: targetSlot.sourceStartOffset,
+        bottomSpacerPx,
       });
     } else {
       // Clean break before block starts (at nodeStartPos or contentStartPos)
@@ -392,6 +457,7 @@ export function extractPageBreakTargets(
         breakType: 'between_blocks',
         blockId: targetSlot.blockId,
         textOffset: 0,
+        bottomSpacerPx,
       });
     }
   }

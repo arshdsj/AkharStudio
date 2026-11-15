@@ -230,7 +230,7 @@ describe('Milestone M2F — Stage 3: Edge Cases & Comprehensive Verification', (
     });
 
     it('handles transitions near page boundaries without break isolation', () => {
-      const blocks: ScreenplayBlock[] = Array.from({ length: 25 }, (_, i) => ({
+      const blocks: ScreenplayBlock[] = Array.from({ length: 30 }, (_, i) => ({
         id: `trans-fill-${i}`,
         type: 'action',
         text: `ਦ੍ਰਿਸ਼ ਦੀ ਲਗਾਤਾਰਤਾ ${i + 1}: ਸੂਰਜ ਡੁੱਬਣ ਦੇ ਕਿਨਾਰੇ ਹੈ।`,
@@ -319,15 +319,15 @@ describe('Milestone M2F — Stage 3: Edge Cases & Comprehensive Verification', (
         textLayoutService: layoutService,
       });
 
-      // Letter: 36 certified slots per page (11.0in, 18pt pitch = 36 slots with safety buffer)
-      // A4: 38 certified slots per page (297mm = 841.89pt, 18pt pitch = 38 slots with safety buffer)
+      // Letter: 43 slots per page (11.0in, 15pt pitch = 43 slots)
+      // A4: 46 slots per page (297mm = 841.89pt, 15pt pitch = 46 slots)
       for (const p of letterRes.pages) {
-        expect(p.profile.slotCapacity).toBe(36);
-        expect(p.usedSlots).toBeLessThanOrEqual(36);
+        expect(p.profile.slotCapacity).toBe(43);
+        expect(p.slots.filter(s => s.kind === 'text').length).toBeLessThanOrEqual(43);
       }
       for (const p of a4Res.pages) {
-        expect(p.profile.slotCapacity).toBe(38);
-        expect(p.usedSlots).toBeLessThanOrEqual(38);
+        expect(p.profile.slotCapacity).toBe(46);
+        expect(p.slots.filter(s => s.kind === 'text').length).toBeLessThanOrEqual(46);
       }
 
       // Letter requires equal or more pages than A4 for the same content

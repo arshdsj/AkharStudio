@@ -12,89 +12,66 @@
  * 3. Safe Production Default: Always defaults to 'legacy'.
  */
 
-export type PaginationEngineSetting = 'legacy' | 'unified';
+export type PaginationEngineSetting = 'unified';
 
 export const PAGINATION_SETTING_STORAGE_KEY = 'akhar_pagination_engine';
-export const DEFAULT_PAGINATION_ENGINE: PaginationEngineSetting = 'legacy';
+export const DEFAULT_PAGINATION_ENGINE: PaginationEngineSetting = 'unified';
 
 /**
  * Validates whether a value is a recognised PaginationEngineSetting.
  */
 export function isValidPaginationEngine(val: unknown): val is PaginationEngineSetting {
-  return val === 'legacy' || val === 'unified';
+  return val === 'unified';
 }
 
 /**
- * Resolves the active pagination engine following deterministic precedence rules:
- * 1. Saved user preference in localStorage (if valid).
- * 2. Explicit development/test override (window.__AKHAR_USE_UNIFIED_PAGINATION__ or process.env.AKHAR_USE_UNIFIED_PAGINATION).
- * 3. Safe production default ('legacy').
+ * Resolves the active pagination engine.
+ * Unified pagination is the sole authoritative engine.
  */
 export function resolvePaginationEngine(
-  savedPreference?: string | null,
-  devOverride?: boolean
+  _savedPreference?: string | null,
+  _devOverride?: boolean
 ): PaginationEngineSetting {
-  // 1. Saved user preference takes highest priority so dev flags don't silently override user choices
-  if (savedPreference && isValidPaginationEngine(savedPreference)) {
-    return savedPreference;
-  }
-
-  // 2. Explicit development or test override
-  if (devOverride === true) {
-    return 'unified';
-  }
-
-  // 3. Safe production default
-  return DEFAULT_PAGINATION_ENGINE;
+  return 'unified';
 }
 
 /**
  * Checks whether an explicit development override is currently active in the runtime environment.
  */
 export function isDevPaginationOverrideActive(): boolean {
-  if (typeof window !== 'undefined') {
-    const win = window as unknown as { __AKHAR_USE_UNIFIED_PAGINATION__?: boolean };
-    if (win.__AKHAR_USE_UNIFIED_PAGINATION__ === true) {
-      return true;
-    }
-  }
-  if (typeof process !== 'undefined' && process.env) {
-    if (process.env.AKHAR_USE_UNIFIED_PAGINATION === '1') {
-      return true;
-    }
-  }
-  return false;
+  return true;
 }
 
 /**
- * Loads the active pagination engine setting from persistent application storage
- * applying full precedence resolution.
+ * Loads the active pagination engine setting from persistent application storage,
+ * migrating any legacy 'legacy' value to 'unified'.
  */
 export function getStoredPaginationEngine(): PaginationEngineSetting {
-  let saved: string | null = null;
   try {
     if (typeof localStorage !== 'undefined') {
-      saved = localStorage.getItem(PAGINATION_SETTING_STORAGE_KEY);
+      const saved = localStorage.getItem(PAGINATION_SETTING_STORAGE_KEY);
+      if (saved === 'legacy') {
+        localStorage.setItem(PAGINATION_SETTING_STORAGE_KEY, 'unified');
+      }
     }
   } catch (err) {
-    console.warn('[PaginationSetting] Failed to read from localStorage:', err);
+    console.warn('[PaginationSetting] Failed to read/migrate localStorage:', err);
   }
 
-  const devOverride = isDevPaginationOverrideActive();
-  return resolvePaginationEngine(saved, devOverride);
+  return 'unified';
 }
 
 /**
  * Persists the user's pagination engine choice to application storage.
  */
 export function setStoredPaginationEngine(engine: PaginationEngineSetting): void {
-  if (!isValidPaginationEngine(engine)) {
-    console.warn(`[PaginationSetting] Invalid pagination engine '${engine}', ignoring set request.`);
+  if (engine !== 'unified' && engine !== 'legacy') {
+    console.warn('[PaginationSetting] Invalid engine setting:', engine);
     return;
   }
   try {
     if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(PAGINATION_SETTING_STORAGE_KEY, engine);
+      localStorage.setItem(PAGINATION_SETTING_STORAGE_KEY, 'unified');
     }
   } catch (err) {
     console.warn('[PaginationSetting] Failed to write to localStorage:', err);

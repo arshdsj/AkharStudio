@@ -25,6 +25,7 @@ import { draftToProseMirrorDoc } from '../src/core/editor/documentAdapter';
 import {
   createUnifiedPaginationPlugin,
   unifiedPaginationPluginKey,
+  computeUnifiedDegradedDecorations,
 } from '../src/core/editor/unifiedPaginationPlugin';
 import { ScriptDraft } from '../src/types/screenplay';
 import { createTextLayoutService } from '../src/core/layout/textLayoutService';
@@ -79,8 +80,8 @@ describe('Milestone M2B: Unified Editor Pagination Plugin', () => {
   // ===========================================================================
   describe('2. Virtual Page Break Decorations & DOM Generation', () => {
     it('generates clean between-block page break widgets with running headers', () => {
-      // 36 lines fills Page 1 on Letter. b3 should start on Page 2 with an inter-block break
-      const actionText = Array(34).fill('A standard action line.').join('\n');
+      // 41 action lines + heading fits on page 1 (43 slots); b3 needs 2 slots and breaks cleanly to page 2
+      const actionText = Array(41).fill('A standard action line.').join('\n');
       const draft = createTestDraft([
         { id: 'b1', type: 'scene_heading', text: 'INT. DARBAR SAHIB - NIGHT' },
         { id: 'b2', type: 'action', text: actionText },
@@ -116,8 +117,8 @@ describe('Milestone M2B: Unified Editor Pagination Plugin', () => {
     });
 
     it('generates mid-block dialogue continuation widgets with presentation (MORE) and (CONT\'D)', () => {
-      // 28 lines of action + 1 character cue + 8 lines of dialogue = splits dialogue at slot 35
-      const actionLines = Array(28).fill('Action line filling space on page one.').join('\n');
+      // 36 lines of action + 1 character cue + 8 lines of dialogue = splits dialogue
+      const actionLines = Array(36).fill('Action line filling space on page one.').join('\n');
       const dialogueLines = Array(8).fill('Dialogue line continuing across the page boundary.').join('\n');
 
       const draft = createTestDraft([
@@ -488,9 +489,9 @@ describe('Milestone M2B: Unified Editor Pagination Plugin', () => {
   // 5. Letter vs A4 Physical Capacity Verification
   // ===========================================================================
   describe('5. Letter vs A4 Physical Capacity Verification', () => {
-    it('verifies capacity difference: 36 slots (Letter) vs 38 slots (A4)', () => {
-      // 36 lines of action fits exactly on 1 page of A4 (capacity 38), but triggers 2 pages on Letter (capacity 36)
-      const actionText = Array(35).fill('Line of action content.').join('\n');
+    it('verifies capacity difference: 43 slots (Letter) vs 46 slots (A4)', () => {
+      // 43 lines + margin + 1 line exceeds Letter (43 slots) but fits cleanly on A4 (46 slots)
+      const actionText = Array(43).fill('Line of action content.').join('\n');
       const draft = createTestDraft([
         { id: 'b1', type: 'action', text: actionText },
         { id: 'b2', type: 'action', text: 'Last line.' },
@@ -655,7 +656,7 @@ describe('Milestone M2B: Unified Editor Pagination Plugin', () => {
   // 7. Both Continuation Preference States (Requirement 4)
   // ===========================================================================
   describe('7. Both Continuation Preference States', () => {
-    const actionLines = Array(28).fill('Action line filling space on page one.').join('\n');
+    const actionLines = Array(36).fill('Action line filling space on page one.').join('\n');
     const dialogueLines = Array(8).fill('Dialogue line continuing across the page boundary.').join('\n');
 
     const commonDraft = createTestDraft([
@@ -766,6 +767,59 @@ describe('Milestone M2B: Unified Editor Pagination Plugin', () => {
       expect(target?.contdText).toBe("AMARJIT (CONT'D)");
 
       view.destroy();
+    });
+  });
+
+  describe('12. Degraded Emergency Mode & Fallback Notifications', () => {
+    it('emergency character-count fallback path shows amber badge and triggers onFallback', () => {
+      // Build a multi-block draft that requires multiple pages under emergency estimation
+      const blocks: any[] = [];
+      for (let i = 0; i < 50; i++) {
+        blocks.push({
+          id: `act-${i}`,
+          type: 'action',
+          text: `Action line ${i} with substantial Punjabi and Latin text that exceeds slot allocations.`,
+        });
+      }
+      const draft = createTestDraft(blocks, 'emergency-draft', 'Emergency Test');
+      const doc = draftToProseMirrorDoc(draft);
+
+      const fallbackCalls: Array<{ reason: string; details: any }> = [];
+      const onFallback = (reason: string, details?: any) => {
+        fallbackCalls.push({ reason, details });
+      };
+
+      const throwingEngine = {
+        paginate: () => {
+          throw new Error('Simulated engine explosion');
+        },
+      };
+
+      const decos = computeUnifiedDegradedDecorations(
+        doc,
+        'letter',
+        'none',
+        'engine_error',
+        onFallback,
+        throwingEngine as any
+      );
+
+      // Expect onFallback to have been called with 'emergency_fallback'
+      expect(fallbackCalls.length).toBeGreaterThan(0);
+      expect(fallbackCalls.some((c) => c.reason === 'emergency_fallback')).toBe(true);
+
+      // Expect decorations to be produced
+      expect(decos).toBeDefined();
+      const foundDecos = decos.find();
+      expect(foundDecos.length).toBeGreaterThan(0);
+
+      // Render widget DOM
+      const dom = (foundDecos[0] as any).type.toDOM();
+      expect(dom).toBeInstanceOf(HTMLElement);
+      expect(dom.getAttribute('data-pagination-engine')).toBe('unified-degraded');
+      const badge = dom.querySelector('.screenplay-page-break__badge--degraded');
+      expect(badge).not.toBeNull();
+      expect(badge?.textContent).toMatch(/PAGE \d+ • DEGRADED/);
     });
   });
 });

@@ -56,6 +56,7 @@ export interface ElectronAPI {
     password?: string;
     preserveCharacterHighlights?: boolean;
     useUnifiedPagination?: boolean;
+    paginationResult?: any;
   }) => Promise<ExportResult>;
   exportTextFile: (defaultTitle: string, content: string) => Promise<ExportResult>;
   exportFountainFile: (defaultTitle: string, content: string) => Promise<ExportResult>;

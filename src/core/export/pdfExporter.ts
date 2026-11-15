@@ -19,7 +19,7 @@ import {
   IPaginationEngine,
   createPageProfile,
 } from '../layout/paginationEngine';
-import { draftToLayoutBlocks, KNOWN_SCREENPLAY_BLOCK_TYPES } from '../layout/paginationAdapter';
+import { draftToLayoutBlocks, TextMarkRun } from '../layout/paginationAdapter';
 import { createTextLayoutService, ITextLayoutService } from '../layout/textLayoutService';
 import {
   FontMetricsProvider,
@@ -29,6 +29,15 @@ import {
   EXPECTED_NOTO_SANS_GURMUKHI,
   FontValidationResult,
 } from '../layout/fontMetrics';
+import {
+  CANONICAL_FONT_STACK,
+  CANONICAL_TEXT_RENDERING,
+  CANONICAL_FONT_KERNING,
+  CANONICAL_FONT_FEATURE_SETTINGS,
+  CANONICAL_WEBKIT_FONT_SMOOTHING,
+  LINE_PITCH_PX,
+  FONT_SIZE_PX,
+} from '../layout/screenplayGeometry';
 
 export interface PdfExportOptions {
   paperSize: PaperSize;
@@ -44,6 +53,7 @@ export interface PdfExportOptions {
   textLayoutService?: ITextLayoutService;
   paginationEngine?: IPaginationEngine;
   allowHeadlessFallback?: boolean;
+  linePitchPx?: number;
 }
 
 export interface PageGeometry {
@@ -94,343 +104,13 @@ export function getPageGeometry(paperSize: PaperSize): PageGeometry {
  */
 export function generateScreenplayHtml(
   draft: ScriptDraft,
-  metadata: TitleMetadata,
+  metadata: Partial<TitleMetadata>,
   options: PdfExportOptions
 ): string {
-  if (options.useUnifiedPagination) {
-    const hasUnsupportedBlocks =
-      Array.isArray(draft.blocks) &&
-      draft.blocks.some((b) => !KNOWN_SCREENPLAY_BLOCK_TYPES.has(b.type));
-
-    if (hasUnsupportedBlocks) {
-      console.warn(
-        '[PdfExporter] Unsupported screenplay block type detected in draft. Falling back to legacy PDF export to ensure 100% content preservation.'
-      );
-    } else {
-      try {
-        return generateUnifiedScreenplayPdfHtml(draft, metadata, options);
-      } catch (err) {
-        console.warn(
-          `[PdfExporter] Unified PDF export failed (${err instanceof Error ? err.message : String(err)}). Falling back to legacy PDF export.`
-        );
-      }
-    }
-  }
-
-  const geometry = getPageGeometry(options.paperSize);
-
-  // Embed base64 fonts if provided
-  const courierFontFace = options.courierFontBase64
-    ? `@font-face {
-        font-family: 'Courier Prime';
-        src: url(data:font/truetype;charset=utf-8;base64,${options.courierFontBase64}) format('truetype');
-        font-weight: normal;
-        font-style: normal;
-      }`
-    : '';
-
-  const gurmukhiFontFace = options.gurmukhiFontBase64
-    ? `@font-face {
-        font-family: 'Noto Sans Gurmukhi';
-        src: url(data:font/truetype;charset=utf-8;base64,${options.gurmukhiFontBase64}) format('truetype');
-        font-weight: 100 900;
-        font-style: normal;
-      }`
-    : '';
-
-  // Title Page HTML
-  const titlePageHtml = options.includeTitlePage
-    ? `
-    <div class="title-page">
-      <div class="title-top-space"></div>
-      <div class="title-center-block">
-        ${metadata.titleImageUrl ? `<div class="title-artwork-container"><img src="${metadata.titleImageUrl}" class="title-artwork" alt="Script Title Artwork" /></div>` : ''}
-        <h1 class="title-text">${escapeHtml(metadata.title || 'UNTITLED')}</h1>
-        <p class="title-written-by">${metadata.basedOn ? escapeHtml(metadata.basedOn) : 'ਵੱਲੋਂ / by'}</p>
-        <p class="title-author">${escapeHtml(metadata.author || '')}</p>
-      </div>
-      <div class="title-bottom-block">
-        <div class="title-meta-left">
-          ${metadata.rights ? `<p>${escapeHtml(metadata.rights)}</p>` : ''}
-          ${metadata.contact ? `<p class="contact-text">${escapeHtml(metadata.contact)}</p>` : ''}
-        </div>
-      </div>
-    </div>
-    `
-    : '';
-
-  const highlightCfg = options.highlightCharacters;
-  const isHighlightActive = Boolean(
-    highlightCfg &&
-    highlightCfg.enabled &&
-    highlightCfg.selectedCharacters &&
-    highlightCfg.selectedCharacters.length > 0 &&
-    options.preserveCharacterHighlights !== false
-  );
-
-  const selectedCharSet = isHighlightActive
-    ? new Set(highlightCfg!.selectedCharacters.map((c) => c.toUpperCase().trim()))
-    : new Set<string>();
-  const highlightColor = highlightCfg?.color || 'rgba(167, 139, 250, 0.35)';
-
-  let currentSpeaker: string | null = null;
-
-  // Render screenplay blocks with strict layout metrics (PAGE-02, ARCH-04)
-  const blocksHtml = draft.blocks
-    .map((block) => {
-      const escapedText = escapeHtml(block.text);
-
-      let isHighlighted = false;
-      if (isHighlightActive) {
-        if (block.type === 'scene_heading') {
-          currentSpeaker = null;
-        } else if (block.type === 'character') {
-          const charName = normalizeCharacterName(block.text);
-          if (charName && selectedCharSet.has(charName)) {
-            currentSpeaker = charName;
-            isHighlighted = true;
-          } else {
-            currentSpeaker = null;
-          }
-        } else if (currentSpeaker && (block.type === 'dialogue' || block.type === 'parenthetical')) {
-          isHighlighted = true;
-        } else {
-          currentSpeaker = null;
-        }
-      }
-
-      const content = isHighlighted && escapedText
-        ? `<span class="character-highlight" style="background-color: ${highlightColor}; -webkit-print-color-adjust: exact; print-color-adjust: exact; border-radius: 2px; padding: 1px 3px;">${escapedText}</span>`
-        : escapedText;
-
-      switch (block.type) {
-        case 'scene_heading':
-          return `<div class="scene-heading" id="${block.id}">${content}</div>`;
-        case 'action':
-          return `<div class="action" id="${block.id}">${content || '&nbsp;'}</div>`;
-        case 'character':
-          return `<div class="character" id="${block.id}">${content}</div>`;
-        case 'parenthetical':
-          return `<div class="parenthetical" id="${block.id}">${content}</div>`;
-        case 'dialogue':
-          return `<div class="dialogue" id="${block.id}">${content}</div>`;
-        case 'transition':
-          return `<div class="transition" id="${block.id}">${content}</div>`;
-        case 'shot':
-          return `<div class="shot" id="${block.id}">${content}</div>`;
-        default:
-          return `<div class="action" id="${block.id}">${content}</div>`;
-      }
-    })
-    .join('\n');
-
-  return `<!DOCTYPE html>
-<html lang="pa-Guru">
-<head>
-  <meta charset="UTF-8">
-  <title>${escapeHtml(metadata.title || 'Screenplay')}</title>
-  <style>
-    ${courierFontFace}
-    ${gurmukhiFontFace}
-
-    @page {
-      size: ${geometry.width} ${geometry.height};
-      margin-top: ${geometry.marginTop};
-      margin-right: ${geometry.marginRight};
-      margin-bottom: ${geometry.marginBottom};
-      margin-left: ${geometry.marginLeft};
-      @top-right {
-        content: counter(page) ".";
-        font-family: 'Courier Prime', 'Noto Sans Gurmukhi', monospace;
-        font-size: 10pt;
-      }
-    }
-
-    @page :first {
-      /* Suppress header/page number on the first page */
-      @top-right {
-        content: "";
-      }
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      margin: 0;
-      padding: 0;
-      font-family: 'Courier Prime', 'Noto Sans Gurmukhi', monospace;
-      font-size: 12pt;
-      line-height: 14.5pt;
-      color: #000000;
-      background: #ffffff;
-      -webkit-font-smoothing: antialiased;
-    }
-
-    .title-page {
-      min-height: ${options.paperSize === 'a4' ? '246mm' : '9.0in'};
-      box-sizing: border-box;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      page-break-after: always;
-      break-after: page;
-      text-align: center;
-    }
-
-    .title-top-space {
-      height: ${metadata.titleImageUrl ? '1.5in' : '2.5in'};
-    }
-
-    .title-center-block {
-      flex: 1;
-    }
-
-    .title-artwork-container {
-      margin: 0 auto 20pt auto;
-      text-align: center;
-    }
-
-    .title-artwork {
-      max-width: 5.5in;
-      max-height: 2.5in;
-      object-fit: contain;
-      display: inline-block;
-    }
-
-    .title-text {
-      font-size: 18pt;
-      font-weight: bold;
-      letter-spacing: 1.5px;
-      margin: 0 0 18pt 0;
-      text-transform: uppercase;
-    }
-
-    .title-written-by {
-      font-size: 12pt;
-      margin: 0 0 6pt 0;
-    }
-
-    .title-author {
-      font-size: 14pt;
-      margin: 0;
-    }
-
-    .title-bottom-block {
-      display: flex;
-      justify-content: space-between;
-      text-align: left;
-      font-size: 10pt;
-      line-height: 13pt;
-      padding-bottom: 0.5in;
-    }
-
-    .contact-text {
-      white-space: pre-wrap;
-      margin-top: 6pt;
-    }
-
-    .page-break {
-      page-break-after: always;
-      break-after: page;
-    }
-
-    .screenplay-body {
-      padding-top: 4pt;
-    }
-
-    /* Standard Screenplay Element Layout (PAGE-02, ARCH-04) */
-    /* Scene Heading with subtle separator line (Requirement 1.B) */
-    .scene-heading {
-      border-top: 0.5pt solid #d1d5db;
-      padding-top: 8pt;
-      margin-top: 18pt;
-      margin-bottom: 12pt;
-      text-transform: uppercase;
-      font-weight: bold;
-      page-break-after: avoid;
-      break-after: avoid;
-      page-break-inside: avoid;
-      break-inside: avoid;
-    }
-
-    .action {
-      margin-top: 0;
-      margin-bottom: 12pt;
-      max-width: 6.0in;
-      white-space: pre-wrap;
-      word-wrap: break-word;
-    }
-
-    /* Anti-orphan rule (ARCH-04): never isolate Character cue at page bottom */
-    /* Bold Character Names (Requirement 1.A) */
-    .character {
-      margin-top: 12pt;
-      margin-bottom: 0;
-      margin-left: 2.2in;
-      text-transform: uppercase;
-      font-weight: bold;
-      page-break-after: avoid;
-      break-after: avoid;
-      break-inside: avoid;
-    }
-
-    /* Parenthetical: keep attached to character and following dialogue */
-    .parenthetical {
-      margin-top: 0;
-      margin-bottom: 0;
-      margin-left: 1.6in;
-      max-width: 3.0in;
-      page-break-after: avoid;
-      break-after: avoid;
-      break-inside: avoid;
-    }
-
-    /* Dialogue: avoid mid-speech page rupture where possible */
-    .dialogue {
-      margin-top: 0;
-      margin-bottom: 12pt;
-      margin-left: 1.0in;
-      max-width: 3.5in;
-      white-space: pre-wrap;
-      word-wrap: break-word;
-      page-break-inside: avoid;
-      break-inside: avoid;
-    }
-
-    .transition {
-      margin-top: 12pt;
-      margin-bottom: 12pt;
-      margin-left: 4.5in;
-      text-transform: uppercase;
-      page-break-before: avoid;
-      break-before: avoid;
-    }
-
-    .shot {
-      margin-top: 18pt;
-      margin-bottom: 12pt;
-      text-transform: uppercase;
-      font-weight: bold;
-      page-break-after: avoid;
-      break-after: avoid;
-    }
-
-    .character-highlight {
-      -webkit-print-color-adjust: exact !important;
-      print-color-adjust: exact !important;
-      display: inline;
-    }
-  </style>
-</head>
-<body>
-  ${titlePageHtml}
-  <div class="screenplay-body">
-    ${blocksHtml}
-  </div>
-</body>
-</html>`;
+  return generateUnifiedScreenplayPdfHtml(draft, metadata, {
+    ...options,
+    useUnifiedPagination: true,
+  });
 }
 
 function escapeHtml(text: string): string {
@@ -440,6 +120,34 @@ function escapeHtml(text: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function renderFormattedLineText(text: string, markRuns?: TextMarkRun[]): string {
+  if (!markRuns || markRuns.length === 0) {
+    return escapeHtml(text);
+  }
+  let html = '';
+  let cur = 0;
+  for (const run of markRuns) {
+    if (run.start > cur) {
+      html += escapeHtml(text.slice(cur, run.start));
+    }
+    const runText = escapeHtml(text.slice(run.start, run.end));
+    if (run.bold && run.italic) {
+      html += `<strong><em>${runText}</em></strong>`;
+    } else if (run.bold) {
+      html += `<strong>${runText}</strong>`;
+    } else if (run.italic) {
+      html += `<em>${runText}</em>`;
+    } else {
+      html += runText;
+    }
+    cur = run.end;
+  }
+  if (cur < text.length) {
+    html += escapeHtml(text.slice(cur));
+  }
+  return html;
 }
 
 function getBlockCssClass(type: ScreenplayBlockType): string {
@@ -493,7 +201,7 @@ export async function validateExportFonts(options: {
  */
 export function generateUnifiedScreenplayPdfHtml(
   draft: ScriptDraft,
-  metadata: TitleMetadata,
+  metadata: Partial<TitleMetadata>,
   options: PdfExportOptions
 ): string {
   const geometry = getPageGeometry(options.paperSize);
@@ -577,10 +285,13 @@ export function generateUnifiedScreenplayPdfHtml(
 
   // 3. Resolve PaginationResult
   let paginationResult = options.paginationResult;
+  const effectiveLinePitchPt = options.linePitchPx ? (options.linePitchPx * 72) / 96 : undefined;
+  const effectivePitchPx = options.linePitchPx ?? LINE_PITCH_PX;
+
   if (!paginationResult) {
     const layoutBlocks = draftToLayoutBlocks(draft);
     const engine = options.paginationEngine ?? createPaginationEngine();
-    const profile = createPageProfile(options.paperSize);
+    const profile = createPageProfile(options.paperSize, effectiveLinePitchPt ? { linePitchPt: effectiveLinePitchPt } : undefined);
 
     let layoutService = options.textLayoutService;
     if (!layoutService) {
@@ -592,15 +303,17 @@ export function generateUnifiedScreenplayPdfHtml(
           provider.measureWidth('test');
           fontMetrics = provider;
         } catch (ctxErr) {
-          if (!options.allowHeadlessFallback) {
+          if (options.allowHeadlessFallback === false) {
             throw new Error(
               `Canvas 2D context is unavailable for certified font measurement in current environment. ` +
               `Silent fallback to uncertified pitch is prohibited in production PDF export. (${String(ctxErr)})`
             );
           }
-          // In explicit headless Node test environments, allow specified fallback
+          // In explicit headless Node test environments, allow script-aware proportional fallback:
+          // Courier Prime (Latin monospace) is 7.2pt per character at 12pt (10 cpi);
+          // Noto Sans Gurmukhi (proportional) is ~4.3pt average advance width at 12pt.
           fontMetrics = new FontMetricsProvider({
-            measureFn: (text) => Number((text.length * 7.2).toFixed(4)),
+            measureFn: (text) => (/[\u0A00-\u0A7F]/.test(text) ? Number((text.length * 4.3).toFixed(4)) : Number((text.length * 7.2).toFixed(4))),
           });
         }
       }
@@ -610,7 +323,7 @@ export function generateUnifiedScreenplayPdfHtml(
     paginationResult = engine.paginate(layoutBlocks, {
       profile,
       paperSize: options.paperSize,
-      contdSetting: options.contdSetting ?? 'on',
+      contdSetting: options.contdSetting ?? 'none',
       textLayoutService: layoutService,
     });
   }
@@ -640,7 +353,6 @@ export function generateUnifiedScreenplayPdfHtml(
           const slot = slotItems[i];
 
           if (slot.kind === 'blank_line') {
-            renderedElements.push('<div class="slot-line slot-blank-line">&nbsp;</div>');
             i++;
             continue;
           }
@@ -680,12 +392,13 @@ export function generateUnifiedScreenplayPdfHtml(
             const isHighlighted = highlightedBlockIds.has(currentBlockId);
             const blockLinesHtml = blockSlots
               .map((s) => {
-                const rawLineText = s.line ? s.line.text : s.presentationText || '';
-                const escapedLineText = escapeHtml(rawLineText);
+                const formattedContent = s.line
+                  ? renderFormattedLineText(s.line.text, s.line.markRuns)
+                  : escapeHtml(s.presentationText || '');
                 const content =
-                  isHighlighted && escapedLineText
-                    ? `<span class="character-highlight" style="background-color: ${highlightColor}; -webkit-print-color-adjust: exact; print-color-adjust: exact; border-radius: 2px; padding: 1px 3px;">${escapedLineText}</span>`
-                    : escapedLineText;
+                  isHighlighted && formattedContent
+                    ? `<span class="character-highlight" style="background-color: ${highlightColor}; -webkit-print-color-adjust: exact; print-color-adjust: exact; border-radius: 2px; padding: 1px 3px;">${formattedContent}</span>`
+                    : formattedContent;
                 return `<div class="screenplay-line">${content || '&nbsp;'}</div>`;
               })
               .join('\n');
@@ -734,10 +447,13 @@ export function generateUnifiedScreenplayPdfHtml(
       padding: 0;
       background: #ffffff;
       color: #000000;
-      font-family: 'Courier Prime', 'Noto Sans Gurmukhi', monospace;
-      font-size: 12pt;
-      line-height: 18pt;
-      -webkit-font-smoothing: antialiased;
+      font-family: ${CANONICAL_FONT_STACK};
+      font-size: ${FONT_SIZE_PX}px;
+      line-height: ${effectivePitchPx}px;
+      text-rendering: ${CANONICAL_TEXT_RENDERING};
+      font-kerning: ${CANONICAL_FONT_KERNING};
+      font-feature-settings: ${CANONICAL_FONT_FEATURE_SETTINGS};
+      -webkit-font-smoothing: ${CANONICAL_WEBKIT_FONT_SMOOTHING};
     }
 
     .page-sheet {
@@ -747,7 +463,7 @@ export function generateUnifiedScreenplayPdfHtml(
       page-break-after: always;
       break-after: page;
       position: relative;
-      overflow: hidden;
+      overflow: visible;
       box-sizing: border-box;
       background: #ffffff;
     }
@@ -761,7 +477,7 @@ export function generateUnifiedScreenplayPdfHtml(
       position: absolute;
       top: 36pt;
       right: ${geometry.marginRight};
-      font-family: 'Courier Prime', 'Noto Sans Gurmukhi', monospace;
+      font-family: ${CANONICAL_FONT_STACK};
       font-size: 10pt;
       line-height: 14pt;
       text-align: right;
@@ -772,6 +488,13 @@ export function generateUnifiedScreenplayPdfHtml(
       width: 100%;
       height: 100%;
       position: relative;
+    }
+
+    .page-content > .screenplay-block:first-child,
+    .page-content > :first-child {
+      margin-top: 0 !important;
+      border-top: none !important;
+      padding-top: 0 !important;
     }
 
     .title-page {
@@ -835,92 +558,118 @@ export function generateUnifiedScreenplayPdfHtml(
       margin-top: 6pt;
     }
 
-    /* Strict Screenplay Baseline Grid & Metrics (18.0pt Line Pitch) */
+    /* Screenplay Canonical Geometry (Target Geometry: 16px line pitch, 16px blank lines between blocks) */
     .screenplay-block {
-      margin-top: 0;
-      margin-bottom: 0;
       padding-top: 0;
       padding-bottom: 0;
       box-sizing: border-box;
+      overflow: visible;
     }
 
     .screenplay-line {
-      height: 18pt;
-      line-height: 18pt;
-      font-size: 12pt;
+      line-height: ${effectivePitchPx}px;
+      font-size: ${FONT_SIZE_PX}px;
+      height: ${effectivePitchPx}px;
+      min-height: ${effectivePitchPx}px;
       margin: 0;
       padding: 0;
-      white-space: pre-wrap;
-      word-wrap: break-word;
+      white-space: pre;
+      overflow: visible;
       box-sizing: border-box;
     }
 
     .slot-line {
-      height: 18pt;
-      line-height: 18pt;
-      font-size: 12pt;
+      line-height: ${effectivePitchPx}px;
+      font-size: ${FONT_SIZE_PX}px;
+      height: ${effectivePitchPx}px;
+      min-height: ${effectivePitchPx}px;
       margin: 0;
       padding: 0;
+      white-space: pre;
+      overflow: visible;
       box-sizing: border-box;
-    }
-
-    .slot-blank-line {
-      height: 18pt;
-      line-height: 18pt;
     }
 
     .scene-heading {
       margin-left: 0;
       max-width: ${geometry.printableWidth};
+      margin-top: ${2 * effectivePitchPx}px;
+      margin-bottom: ${effectivePitchPx}px;
       text-transform: uppercase;
       font-weight: bold;
+      border-top: none;
+      overflow: visible;
     }
 
     .action {
       margin-left: 0;
       max-width: ${geometry.printableWidth};
+      margin-top: 0;
+      margin-bottom: ${effectivePitchPx}px;
+      overflow: visible;
     }
 
     .character {
       margin-left: 2.2in;
+      margin-top: ${effectivePitchPx}px;
+      margin-bottom: 0;
       text-transform: uppercase;
       font-weight: bold;
+      overflow: visible;
     }
 
     .parenthetical {
       margin-left: 1.6in;
-      max-width: 3.0in;
+      max-width: 2.2in;
+      margin-top: 0;
+      margin-bottom: 0;
+      overflow: visible;
     }
 
     .dialogue {
       margin-left: 1.0in;
       max-width: 3.5in;
+      margin-top: 0;
+      margin-bottom: ${effectivePitchPx}px;
+      overflow: visible;
     }
 
     .transition {
-      margin-left: 4.5in;
+      margin-left: 4.0in;
+      margin-top: ${effectivePitchPx}px;
+      margin-bottom: ${effectivePitchPx}px;
       text-transform: uppercase;
+      overflow: visible;
     }
 
     .shot {
       margin-left: 0;
       max-width: ${geometry.printableWidth};
+      margin-top: ${effectivePitchPx}px;
+      margin-bottom: ${effectivePitchPx}px;
       text-transform: uppercase;
       font-weight: bold;
+      overflow: visible;
     }
 
     .screenplay-more-continuation {
       margin-left: 1.0in;
       max-width: 3.5in;
       text-align: center;
-      font-family: 'Courier Prime', 'Noto Sans Gurmukhi', monospace;
+      margin-top: 0;
+      margin-bottom: 0;
+      font-family: ${CANONICAL_FONT_STACK};
+      overflow: visible;
     }
 
     .screenplay-contd-continuation {
       margin-left: 2.2in;
       font-weight: bold;
       text-transform: uppercase;
-      font-family: 'Courier Prime', 'Noto Sans Gurmukhi', monospace;
+      margin-top: 0;
+      margin-bottom: 0;
+      font-family: ${CANONICAL_FONT_STACK};
+      overflow: visible;
     }
 
     .character-highlight {
@@ -1007,7 +756,7 @@ export function extractCharacterSheetData(draft: ScriptDraft): CharacterSheetEnt
  */
 export function generateCharacterSheetHtml(
   draft: ScriptDraft,
-  metadata: TitleMetadata,
+  metadata: Partial<TitleMetadata>,
   options: PdfExportOptions
 ): string {
   const geometry = getPageGeometry(options.paperSize);

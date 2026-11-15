@@ -6,6 +6,10 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --screenplay-line-pitch: 20px;
+}
+
 @layer base {
   * {
     box-sizing: border-box;
@@ -51,9 +55,18 @@
 .ProseMirror {
   min-height: 8in;
   cursor: text;
-  outline: none !important;
+  outline: none;
+  font-family: 'Courier Prime', 'Noto Sans Gurmukhi', monospace;
+  font-size: 16px;
+  line-height: var(--screenplay-line-pitch, 20px);
+  text-rendering: optimizeLegibility;
+  font-kerning: normal;
+  font-feature-settings: "kern" 1, "liga" 1;
+  -webkit-font-smoothing: antialiased;
   white-space: pre-wrap;
   word-wrap: break-word;
+  overflow-wrap: break-word;
+  overflow: visible;
 }
 
 /* Window Dragging for macOS Custom Titlebar */
@@ -67,8 +80,16 @@
 
 /* Screenplay Block Base Styling */
 .screenplay-block {
-  min-height: 1.5em;
+  min-height: var(--screenplay-line-pitch, 20px);
   position: relative;
+  font-family: 'Courier Prime', 'Noto Sans Gurmukhi', monospace;
+  font-size: 16px;
+  line-height: var(--screenplay-line-pitch, 20px);
+  text-rendering: optimizeLegibility;
+  font-kerning: normal;
+  font-feature-settings: "kern" 1, "liga" 1;
+  -webkit-font-smoothing: antialiased;
+  overflow: visible;
 }
 
 /* Ensure empty blocks retain line height and caret visibility */
@@ -94,12 +115,19 @@
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45), 0 20px 56px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.07);
   border-radius: var(--radius-sm);
   font-family: 'Courier Prime', 'Noto Sans Gurmukhi', monospace;
+  font-size: 16px;
+  line-height: var(--screenplay-line-pitch, 20px);
+  text-rendering: optimizeLegibility;
+  font-kerning: normal;
+  font-feature-settings: "kern" 1, "liga" 1;
+  -webkit-font-smoothing: antialiased;
   position: relative;
   transition: width 0.2s ease;
   caret-color: var(--accent-fill);
   height: auto;
   box-sizing: border-box;
   flex-shrink: 0;
+  overflow: visible;
 }
 
 .screenplay-paper ::selection {
@@ -110,13 +138,13 @@
 .screenplay-paper.paper-letter {
   width: 8.5in;
   min-height: 11in;
-  padding: 1.0in 1.0in 1.0in 1.5in; /* Standard screenplay margins */
+  padding: 1.0in 1.0in 0 1.5in; /* Standard screenplay margins: 96px top, 96px right, 0 bottom, 144px left */
 }
 
 .screenplay-paper.paper-a4 {
   width: 210mm;
   min-height: 297mm;
-  padding: 25.4mm 25.4mm 25.4mm 38.1mm;
+  padding: 25.4mm 25.4mm 0 38.1mm;
 }
 
 /* Screenplay Page Break Divider & Multi-Page Sheet Representation (PAGE-01, PAGE-02, PAGE-03, ARCH-04) */
@@ -125,8 +153,8 @@
   user-select: none;
   -webkit-user-select: none;
   cursor: default;
-  margin-top: 24pt;
-  margin-bottom: 20pt;
+  margin-top: 0;
+  margin-bottom: 0;
 }
 
 .screenplay-page-break.paper-letter {
@@ -141,16 +169,9 @@
   width: 210mm;
 }
 
-.screenplay-page-break__divider {
-  display: flex;
-  flex-direction: column;
+.screenplay-page-break__spacer-bottom {
   width: 100%;
-}
-
-.screenplay-page-break__edge-bottom {
-  height: 2px;
-  background: var(--page-surface);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  pointer-events: none;
 }
 
 .screenplay-page-break__gap {
@@ -159,10 +180,9 @@
   justify-content: center;
   gap: 12px;
   height: 36px;
-  background: var(--surface-canvas);
+  background: transparent;
   margin: 0;
   padding: 0 24px;
-  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.5);
 }
 
 .screenplay-page-break__line {
@@ -185,29 +205,39 @@
   border: 1px solid var(--line-edge, rgba(255, 255, 255, 0.08));
 }
 
-.screenplay-page-break__edge-top {
-  height: 2px;
-  background: var(--page-surface);
-  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+.screenplay-page-break__badge--degraded {
+  background: #f59e0b;
+  color: #1e1e1e;
+  font-weight: 700;
+  border-color: #d97706;
+}
+
+.screenplay-page-break__spacer-top {
+  position: relative;
+  width: 100%;
+  height: 96px; /* 1.0in top margin of new page */
+  pointer-events: none;
 }
 
 .screenplay-page-break__header {
-  position: relative;
-  height: 0.6in;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  padding-right: 1.0in;
-  background: var(--page-surface);
+  position: absolute;
+  top: 48px; /* 0.5in = 48px from top edge of page */
+  right: 1.0in; /* 1.0in from right edge of page */
+  font-family: 'Courier Prime', 'Noto Sans Gurmukhi', monospace;
+  font-size: 16px;
+  line-height: var(--screenplay-line-pitch, 20px);
+  color: var(--text-secondary);
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .screenplay-page-break.paper-a4 .screenplay-page-break__header {
-  padding-right: 25.4mm;
+  right: 25.4mm;
 }
 
 .screenplay-page-break__number {
   font-family: 'Courier Prime', 'Noto Sans Gurmukhi', monospace;
-  font-size: 12px;
+  font-size: 16px;
   color: var(--text-secondary);
   user-select: none;
   -webkit-user-select: none;
@@ -271,60 +301,91 @@
   margin-left: calc(38.1mm + 2.2in);
 }
 
-/* Screenplay Element Indentations */
-.block-scene-heading {
-  font-weight: bold;
-  text-transform: uppercase;
-  margin-top: 24pt;
-  margin-bottom: 12pt;
-  letter-spacing: 0.5px;
-}
-
-.block-action {
+/* Screenplay Element Indentations & Target Geometry (Generated from screenplayGeometry.ts) */
+.ProseMirror > .screenplay-block:first-child,
+.ProseMirror > .screenplay-page-break + .screenplay-block,
+.screenplay-page-break + .screenplay-block {
   margin-top: 0;
-  margin-bottom: 12pt;
-  max-width: 6.0in;
-  line-height: 1.4;
 }
 
-.block-character {
+.ProseMirror > .screenplay-block:has(+ .screenplay-page-break),
+.screenplay-block:has(+ .screenplay-page-break) {
+  margin-bottom: 0;
+}
+
+.ProseMirror .block-scene-heading {
   font-weight: bold;
   text-transform: uppercase;
-  margin-top: 14pt;
+  margin-top: calc(2 * var(--screenplay-line-pitch, 20px));
+  margin-bottom: var(--screenplay-line-pitch, 20px);
+  letter-spacing: 0.5px;
+  line-height: var(--screenplay-line-pitch, 20px);
+  font-size: 16px;
+  max-width: 6.0in;
+  overflow: visible;
+}
+
+.ProseMirror .block-action {
+  margin-top: 0;
+  margin-bottom: var(--screenplay-line-pitch, 20px);
+  max-width: 6.0in;
+  line-height: var(--screenplay-line-pitch, 20px);
+  font-size: 16px;
+  overflow: visible;
+}
+
+.ProseMirror .block-character {
+  font-weight: bold;
+  text-transform: uppercase;
+  margin-top: var(--screenplay-line-pitch, 20px);
   margin-bottom: 0;
   margin-left: 2.2in;
   letter-spacing: 0.5px;
+  line-height: var(--screenplay-line-pitch, 20px);
+  font-size: 16px;
+  overflow: visible;
 }
 
-.block-parenthetical {
+.ProseMirror .block-parenthetical {
   margin-top: 0;
   margin-bottom: 0;
   margin-left: 1.6in;
   max-width: 2.2in;
+  line-height: var(--screenplay-line-pitch, 20px);
+  font-size: 16px;
+  overflow: visible;
 }
 
-.block-dialogue {
+.ProseMirror .block-dialogue {
   margin-top: 0;
-  margin-bottom: 12pt;
+  margin-bottom: var(--screenplay-line-pitch, 20px);
   margin-left: 1.0in;
   max-width: 3.5in;
-  line-height: 1.4;
+  line-height: var(--screenplay-line-pitch, 20px);
+  font-size: 16px;
+  overflow: visible;
 }
 
-.block-transition {
+.ProseMirror .block-transition {
   font-weight: bold;
   text-transform: uppercase;
-  margin-top: 14pt;
-  margin-bottom: 12pt;
+  margin-top: var(--screenplay-line-pitch, 20px);
+  margin-bottom: var(--screenplay-line-pitch, 20px);
   margin-left: 4.0in;
+  line-height: var(--screenplay-line-pitch, 20px);
+  font-size: 16px;
+  overflow: visible;
 }
 
-.block-shot {
+.ProseMirror .block-shot {
   font-weight: bold;
   text-transform: uppercase;
-  margin-top: 14pt;
-  margin-bottom: 12pt;
+  margin-top: var(--screenplay-line-pitch, 20px);
+  margin-bottom: var(--screenplay-line-pitch, 20px);
   letter-spacing: 0.5px;
+  line-height: var(--screenplay-line-pitch, 20px);
+  font-size: 16px;
+  overflow: visible;
 }
 
 /* Disable selection outline for authentic document look */

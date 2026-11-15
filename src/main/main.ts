@@ -14,6 +14,7 @@ import { generateScreenplayHtml, generateCharacterSheetHtml } from '../core/expo
 import { validateFontBuffer, EXPECTED_NOTO_SANS_GURMUKHI } from '../core/layout/fontMetrics';
 import { exportProjectBundle } from '../core/storage/projectBundle';
 import { APP_VERSION, APP_AUTHOR, APP_FULL_NAME } from '../core/version';
+import { PaginationResult } from '../core/layout/paginationEngine';
 
 app.name = 'AkharStudio';
 app.setName('AkharStudio');
@@ -439,6 +440,7 @@ ipcMain.handle(
       password?: string;
       preserveCharacterHighlights?: boolean;
       useUnifiedPagination?: boolean;
+      paginationResult?: PaginationResult;
     }
   ) => {
     if (!mainWindow) return { canceled: true };
@@ -510,7 +512,8 @@ ipcMain.handle(
         highlightCharacters: snapshotProject.settings?.highlightCharacters,
         preserveCharacterHighlights: options.preserveCharacterHighlights,
         useUnifiedPagination: useUnified,
-        contdSetting: snapshotProject.settings?.contdSetting || 'on',
+        paginationResult: options.paginationResult,
+        contdSetting: snapshotProject.settings?.contdSetting || 'none',
       });
     }
 

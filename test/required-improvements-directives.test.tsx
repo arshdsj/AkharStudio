@@ -168,6 +168,7 @@ describe('Akhar Studio – Required Improvements and Directives Verification', (
             selectedCharacters: ['ਗੁਰਮੀਤ ਸਿੰਘ'],
           },
           preserveCharacterHighlights: true,
+          allowHeadlessFallback: true,
         }
       );
 
@@ -176,8 +177,11 @@ describe('Akhar Studio – Required Improvements and Directives Verification', (
       expect(htmlWithHighlights).toContain('ਗੁਰਮੀਤ ਸਿੰਘ');
       expect(htmlWithHighlights).toContain('ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ ਜੀ।');
       // Jasveer is NOT highlighted
-      expect(htmlWithHighlights).toContain('<div class="character" id="b4">ਜਸਵੀਰ</div>');
-      expect(htmlWithHighlights).toContain('<div class="dialogue" id="b5">ਕੀ ਹਾਲ ਹੈ?</div>');
+      expect(htmlWithHighlights).toContain('id="b4"');
+      expect(htmlWithHighlights).toContain('ਜਸਵੀਰ');
+      expect(htmlWithHighlights).toContain('id="b5"');
+      expect(htmlWithHighlights).toContain('ਕੀ ਹਾਲ ਹੈ?');
+      expect(htmlWithHighlights).not.toContain('<span class="character-highlight" style="background-color: rgba(234, 179, 8, 0.4);"><div class="screenplay-line">ਜਸਵੀਰ</div>');
     });
   });
 

@@ -8,9 +8,38 @@ import {
   ScriptDraft,
   ScreenplayBlock,
   ScreenplayStats,
+  ContdSetting,
 } from '../../types/screenplay';
 
 export const CURRENT_SCHEMA_VERSION = 1;
+
+/**
+ * Migrates legacy ContdSetting values ('on', 'off', 'unasked', 'all') to modern non-overlapping values:
+ * - 'on' | 'all' -> 'both' (includes (MORE) at page bottom and (CONT'D) cue at page top)
+ * - 'off' -> 'more_only' (legacy engine emitted (MORE) at page bottom but omitted top (CONT'D))
+ * - 'unasked' -> 'none' (clean break, no markers)
+ */
+export function migrateContdSetting(raw: unknown): ContdSetting {
+  if (raw === 'on' || raw === 'all') {
+    return 'both';
+  }
+  if (raw === 'off') {
+    return 'more_only';
+  }
+  if (raw === 'unasked') {
+    return 'none';
+  }
+  if (
+    raw === 'none' ||
+    raw === 'more_only' ||
+    raw === 'contd_only' ||
+    raw === 'both' ||
+    raw === 'reprint_name'
+  ) {
+    return raw as ContdSetting;
+  }
+  return 'none';
+}
 
 /**
  * Generate a unique random ID
@@ -58,7 +87,7 @@ export function createDefaultProject(): ScriptProject {
     },
     settings: {
       paperSize: 'letter', // Default US Letter (PAGE-01, DEC-014)
-      contdSetting: 'unasked', // CONT-01 tri-state
+      contdSetting: 'none', // Default none (no MORE / CONT'D markers)
       language: 'pa',
       spellcheck: false, // Spellcheck off by default (DEC-020)
       showWordCount: true,
@@ -357,6 +386,12 @@ export function validateScriptProject(data: unknown): ScriptProject {
         throw new Error(`Invalid screenplay block in draft ${draft.id}`);
       }
     }
+  }
+
+  // Migrate legacy ContdSetting values ('on', 'off', 'unasked') to modern non-overlapping values
+  if (p.settings && typeof p.settings === 'object') {
+    const s = p.settings as Record<string, unknown>;
+    s.contdSetting = migrateContdSetting(s.contdSetting);
   }
 
   return p as unknown as ScriptProject;
