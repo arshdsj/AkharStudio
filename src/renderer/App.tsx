@@ -8,6 +8,7 @@ import { HeaderRow2 } from './components/HeaderRow2';
 import { ScreenplayCanvas } from './components/ScreenplayCanvas';
 import { LeftSidebar } from './components/LeftSidebar';
 import { FloatingToolbar } from './components/FloatingToolbar';
+import { RightFormattingToolbar } from './components/RightFormattingToolbar';
 import { StatusChip } from './components/StatusChip';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import { ProjectLibraryModal } from './components/ProjectLibraryModal';
@@ -166,8 +167,9 @@ export const App: React.FC = () => {
   const [pasteConvertInitialText, setPasteConvertInitialText] = useState<string>('');
   const [directPastePrompt, setDirectPastePrompt] = useState<{ isOpen: boolean; text: string } | null>(null);
 
-  const handleOpenRomanConverter = useCallback((initialText = '') => {
-    setPasteConvertInitialText(initialText);
+  const handleOpenRomanConverter = useCallback((initialText?: string) => {
+    const text = typeof initialText === 'string' ? initialText : '';
+    setPasteConvertInitialText(text);
     setIsPasteConvertOpen(true);
   }, []);
 
@@ -1249,7 +1251,6 @@ export const App: React.FC = () => {
         currentFilePath={currentFilePath}
         projectSource={projectSource}
         onOpenLibrary={() => setIsWelcomeOpen(true)}
-        onOpenRomanConverter={handleOpenRomanConverter}
         onOpenSearch={handleOpenSearch}
         onRetrySave={handleSave}
         onExpandTitlePage={() => setIsTitlePageExpanded((prev) => !prev)}
@@ -1382,6 +1383,21 @@ export const App: React.FC = () => {
           onToggleWholeWord={handleToggleWholeWord}
           onFindNext={handleFindNext}
           onFindPrev={handleFindPrev}
+        />
+
+        {/* Contextual Right-Side Formatting Toolbar */}
+        <RightFormattingToolbar
+          activeBlock={activeBlock}
+          isTitleEditing={isTitleEditing}
+          onSelectBlockType={(type) => {
+            if (editorRef.current) {
+              editorRef.current.setBlockType(type);
+            } else if (activeBlock) {
+              handleBlockTypeChange(activeBlock.id, type);
+            }
+            editorRef.current?.focus();
+          }}
+          onKeepFocus={() => editorRef.current?.focus()}
         />
       </div>
 

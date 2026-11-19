@@ -103,7 +103,7 @@ export function convertRomanPunjabiToGurmukhi(
   transliterator: GurmukhiTransliterator = defaultTransliterator,
   options: ConvertOptions = { preserveEnglish: true }
 ): ConversionResult {
-  if (!text) {
+  if (!text || typeof text !== 'string') {
     return { convertedText: '', tokens: [], uncertainCount: 0 };
   }
 

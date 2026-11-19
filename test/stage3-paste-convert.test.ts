@@ -95,5 +95,21 @@ describe('Stage 3: Roman Punjabi to Gurmukhi Conversion Engine', () => {
       expect(uncertainToken?.isUncertain).toBe(true);
       expect(uncertainToken?.suggestions.length).toBeGreaterThan(0);
     });
+
+    it('handles unexpected, malformed, or non-string input safely without crashing', () => {
+      expect(convertRomanPunjabiToGurmukhi(null as any)).toEqual({ convertedText: '', tokens: [], uncertainCount: 0 });
+      expect(convertRomanPunjabiToGurmukhi(undefined as any)).toEqual({ convertedText: '', tokens: [], uncertainCount: 0 });
+      expect(convertRomanPunjabiToGurmukhi({} as any)).toEqual({ convertedText: '', tokens: [], uncertainCount: 0 });
+      expect(convertRomanPunjabiToGurmukhi(12345 as any)).toEqual({ convertedText: '', tokens: [], uncertainCount: 0 });
+      expect(convertRomanPunjabiToGurmukhi('')).toEqual({ convertedText: '', tokens: [], uncertainCount: 0 });
+    });
+
+    it('handles non-string input in transliterator suggest and suggestWithDetails safely', () => {
+      expect(defaultTransliterator.suggestWithDetails(null as any)).toEqual({ candidates: [], rawCandidatesCount: 0, details: [] });
+      expect(defaultTransliterator.suggestWithDetails(undefined as any)).toEqual({ candidates: [], rawCandidatesCount: 0, details: [] });
+      expect(defaultTransliterator.suggestWithDetails({} as any)).toEqual({ candidates: [], rawCandidatesCount: 0, details: [] });
+      expect(defaultTransliterator.suggest(null as any)).toEqual([]);
+      expect(defaultTransliterator.suggest(undefined as any)).toEqual([]);
+    });
   });
 });

@@ -261,6 +261,9 @@ export class GurmukhiTransliterator {
     rawCandidatesCount: number;
     details: SuggestionDetail[];
   } {
+    if (!romanInput || typeof romanInput !== 'string') {
+      return { candidates: [], rawCandidatesCount: 0, details: [] };
+    }
     const roman = romanInput.trim();
     if (!roman) return { candidates: [], rawCandidatesCount: 0, details: [] };
 

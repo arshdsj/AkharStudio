@@ -175,3 +175,184 @@
 
 /* ---- Scrollbars: thin, quiet -------------------------------------------- */
 .ds-panel__body { scrollbar-width: thin; scrollbar-color: var(--gray-500) transparent; }
+
+/* ---- Right-side Formatting Toolbar --------------------------------------- */
+.ds-right-toolbar {
+  position: absolute;
+  right: var(--space-4);
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 30;
+  user-select: none;
+  background: var(--surface-overlay);
+  border: 1px solid var(--line-separator);
+  box-shadow: var(--shadow-overlay), inset 0 1px 0 var(--line-edge);
+  border-radius: var(--radius-lg);
+  color: var(--text-primary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 4px;
+  gap: 2px;
+  width: 44px;
+  transition: opacity var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
+}
+
+.ds-right-toolbar__toggle {
+  position: absolute;
+  right: var(--space-4);
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 30;
+  user-select: none;
+  background: var(--surface-overlay);
+  border: 1px solid var(--line-separator);
+  box-shadow: var(--shadow-overlay), inset 0 1px 0 var(--line-edge);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 40px;
+  cursor: pointer;
+  border: 0;
+  padding: 0;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
+}
+
+.ds-right-toolbar__toggle:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.ds-right-toolbar__toggle:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.ds-right-toolbar__collapse-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  position: relative;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+
+.ds-right-toolbar__collapse-btn:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.ds-right-toolbar__collapse-btn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.ds-right-toolbar__label {
+  font-size: 9px;
+  font-weight: var(--weight-semibold);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--text-disabled);
+  padding: 2px 0 3px;
+  line-height: 1;
+  user-select: none;
+  text-align: center;
+}
+
+.ds-right-toolbar__separator {
+  width: 24px;
+  height: 1px;
+  background: var(--line-separator);
+  margin: 2px 0 4px;
+  flex: none;
+}
+
+.ds-right-toolbar__item {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  position: relative;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+
+.ds-right-toolbar__item:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.ds-right-toolbar__item[aria-pressed="true"],
+.ds-right-toolbar__item.is-active {
+  background: var(--accent-fill);
+  color: var(--text-on-accent);
+}
+
+.ds-right-toolbar__item[aria-pressed="true"]:hover:not(:disabled),
+.ds-right-toolbar__item.is-active:hover:not(:disabled) {
+  background: var(--accent-fill-hover);
+  color: var(--text-on-accent);
+}
+
+.ds-right-toolbar__item:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.ds-right-toolbar__item:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.ds-right-toolbar__tooltip {
+  position: absolute;
+  right: calc(100% + var(--space-3));
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 50;
+  pointer-events: none;
+  user-select: none;
+  width: 236px;
+  background: var(--surface-overlay);
+  border: 1px solid var(--line-separator);
+  box-shadow: var(--shadow-overlay), inset 0 1px 0 var(--line-edge);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  color: var(--text-primary);
+  text-align: left;
+}
+
+.ds-right-toolbar__tooltip--simple {
+  position: absolute;
+  right: calc(100% + var(--space-3));
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 50;
+  pointer-events: none;
+  user-select: none;
+  width: auto;
+  white-space: nowrap;
+  font-size: var(--text-xs);
+  padding: 4px var(--space-2);
+  background: var(--surface-overlay);
+  border: 1px solid var(--line-separator);
+  box-shadow: var(--shadow-overlay);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+}

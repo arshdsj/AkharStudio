@@ -192,7 +192,7 @@ describe('AkharStudio Enhancements Test Suite', () => {
   // =========================================================================
   describe('2. About Section & Version Numbering', () => {
     it('centralizes version as current APP_VERSION and author as Arsh DSJ', () => {
-      expect(APP_VERSION).toBe('1.6');
+      expect(APP_VERSION).toBe('1.7');
       expect(APP_AUTHOR).toBe('Arsh DSJ');
     });
 

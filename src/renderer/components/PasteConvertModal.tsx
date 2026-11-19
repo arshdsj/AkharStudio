@@ -45,7 +45,7 @@ export const PasteConvertModal: React.FC<PasteConvertModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      const textToUse = initialText || '';
+      const textToUse = typeof initialText === 'string' ? initialText : '';
       setInputText(textToUse);
       if (textToUse.trim()) {
         const res = convertRomanPunjabiToGurmukhi(textToUse, defaultTransliterator, {
@@ -70,7 +70,7 @@ export const PasteConvertModal: React.FC<PasteConvertModalProps> = ({
   if (!mounted) return null;
 
   const handleConvert = () => {
-    if (!inputText.trim()) {
+    if (!inputText || typeof inputText !== 'string' || !inputText.trim()) {
       setOutputText('');
       setConversionResult(null);
       return;
@@ -99,7 +99,7 @@ export const PasteConvertModal: React.FC<PasteConvertModalProps> = ({
   };
 
   const handleInsert = () => {
-    if (!outputText.trim()) return;
+    if (!outputText || typeof outputText !== 'string' || !outputText.trim()) return;
     onInsert(outputText, insertMode);
     onClose();
   };
@@ -218,7 +218,7 @@ export const PasteConvertModal: React.FC<PasteConvertModalProps> = ({
                 checked={preserveEnglish}
                 onChange={(e) => {
                   setPreserveEnglish(e.target.checked);
-                  if (inputText.trim()) {
+                  if (inputText && typeof inputText === 'string' && inputText.trim()) {
                     const res = convertRomanPunjabiToGurmukhi(inputText, defaultTransliterator, {
                       preserveEnglish: e.target.checked,
                     });
@@ -316,7 +316,7 @@ export const PasteConvertModal: React.FC<PasteConvertModalProps> = ({
             <button
               type="button"
               onClick={handleInsert}
-              disabled={!outputText.trim()}
+              disabled={!outputText || typeof outputText !== 'string' || !outputText.trim()}
               className="ds-btn ds-btn--primary flex items-center gap-1.5"
             >
               <Check size={14} />

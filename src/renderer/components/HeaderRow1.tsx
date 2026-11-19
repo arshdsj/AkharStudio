@@ -18,7 +18,6 @@ import {
   Maximize2,
   Activity,
   FileSpreadsheet,
-  Languages,
 } from 'lucide-react';
 import { SaveStatus, ProjectSource } from '../../types/screenplay';
 import { AkharStudioLogo } from './AkharStudioLogo';
@@ -33,7 +32,6 @@ interface HeaderRow1Props {
   currentFilePath: string | null;
   projectSource?: ProjectSource;
   onOpenLibrary: () => void;
-  onOpenRomanConverter?: () => void;
   onOpenSearch: () => void;
   onRetrySave: () => void;
   onExpandTitlePage?: () => void;
@@ -54,7 +52,6 @@ export const HeaderRow1: React.FC<HeaderRow1Props> = ({
   currentFilePath,
   projectSource: _projectSource = 'database',
   onOpenLibrary,
-  onOpenRomanConverter,
   onOpenSearch,
   onRetrySave,
   onExpandTitlePage,
@@ -138,20 +135,6 @@ export const HeaderRow1: React.FC<HeaderRow1Props> = ({
           <FolderOpen size={15} />
           <span>Projects</span>
         </button>
-
-        {/* Roman Punjabi to Gurmukhi Paste & Convert button */}
-        {onOpenRomanConverter && (
-          <button
-            type="button"
-            onClick={onOpenRomanConverter}
-            title="Convert Roman Punjabi to Gurmukhi (Paste & Convert)"
-            className="ds-btn ds-btn--quiet flex items-center gap-1.5"
-            style={{ height: 'var(--h-md)', padding: '0 var(--space-2)', fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}
-          >
-            <Languages size={15} />
-            <span>Roman to Gurmukhi</span>
-          </button>
-        )}
 
         <div style={{ width: '1px', height: '16px', background: 'var(--line-separator)' }} />
 

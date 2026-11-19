@@ -838,7 +838,7 @@ export const ProseMirrorEditor = React.forwardRef<ProseMirrorEditorHandle, Prose
           const { $from } = newState.selection;
           if ($from.depth >= 1) {
             const currentBlockNode = newState.doc.child($from.index(0));
-            onActiveBlockChangeRef.current({
+            onActiveBlockChangeRef.current?.({
               id: currentBlockNode.attrs.id,
               type: currentBlockNode.attrs.type as ScreenplayBlockType,
               text: currentBlockNode.textContent,
