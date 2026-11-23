@@ -86,7 +86,7 @@ export function createDefaultProject(): ScriptProject {
       rights: '',
     },
     settings: {
-      paperSize: 'letter', // Default US Letter (PAGE-01, DEC-014)
+      paperSize: 'a4', // Default A4 with Letter available as alternative
       contdSetting: 'none', // Default none (no MORE / CONT'D markers)
       language: 'pa',
       spellcheck: false, // Spellcheck off by default (DEC-020)

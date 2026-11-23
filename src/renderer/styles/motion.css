@@ -1,0 +1,99 @@
+/* ==========================================================================
+   motion.css — Application-Wide Animation & Micro-Interaction System
+   Strictly performance-focused: animates only transform & opacity.
+   Reuses existing design tokens (--dur-fast, --dur-base, --dur-exit, --ease).
+   ========================================================================== */
+
+/* Directional pop-in from edge (used by rail expand, palettes, chips) */
+@keyframes ds-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateX(6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateX(0);
+  }
+}
+
+/* Directional pop-out towards edge (used by rail collapse) */
+@keyframes ds-pop-out {
+  from {
+    opacity: 1;
+    transform: scale(1) translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.92) translateX(6px);
+  }
+}
+
+/* Smooth opacity fade in */
+@keyframes ds-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Smooth opacity fade out */
+@keyframes ds-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* Modal and popover scale fade-in */
+@keyframes ds-popover-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Slide in from right */
+@keyframes ds-slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Universal interactive transitions */
+.ds-interactive-transition {
+  transition: background var(--dur-fast) var(--ease),
+              color var(--dur-fast) var(--ease),
+              opacity var(--dur-fast) var(--ease);
+}
+
+/* Status indicator smooth transition */
+.ds-status-transition {
+  transition: opacity var(--dur-fast) var(--ease),
+              color var(--dur-fast) var(--ease),
+              background var(--dur-fast) var(--ease);
+}
+
+/* Reduced motion guarantee */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -119,9 +119,7 @@ describe('ScreenplayElementMenu & FloatingToolbar Element Selector', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it('toggles menu open and closed when clicking the element button in FloatingToolbar', () => {
-    const onSelectBlockType = vi.fn();
-
+  it('confirms Action/Element button is removed from formatting toolbar', () => {
     render(
       <FloatingToolbar
         activeBlock={dummyBlock}
@@ -133,48 +131,11 @@ describe('ScreenplayElementMenu & FloatingToolbar Element Selector', () => {
         onApplyFormat={vi.fn()}
         onToggleCase={vi.fn()}
         onCopy={vi.fn()}
-        onSelectBlockType={onSelectBlockType}
       />
     );
 
-    // Button shows current element label
-    const elementButton = screen.getByTitle(/Current Screenplay Element: Action/i);
-    expect(elementButton).toBeInTheDocument();
-    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
-
-    // Click button to open menu
-    fireEvent.click(elementButton);
-    expect(screen.getByRole('menu')).toBeInTheDocument();
-
-    // Click 'Dialogue' from the popup
-    const dialogueOption = screen.getByText('Dialogue');
-    fireEvent.click(dialogueOption);
-
-    expect(onSelectBlockType).toHaveBeenCalledWith('dialogue');
-    // Menu should be closed
-    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
-  });
-
-  it('disables element button and forbids opening menu during title editing', () => {
-    render(
-      <FloatingToolbar
-        activeBlock={dummyBlock}
-        isTitleEditing={true}
-        canUndo={true}
-        canRedo={false}
-        onUndo={vi.fn()}
-        onRedo={vi.fn()}
-        onApplyFormat={vi.fn()}
-        onToggleCase={vi.fn()}
-        onCopy={vi.fn()}
-        onSelectBlockType={vi.fn()}
-      />
-    );
-
-    const titleSelector = screen.getByTitle(/Element selector disabled in Title Card/i);
-    expect(titleSelector).toBeDisabled();
-
-    fireEvent.click(titleSelector);
-    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    // Element button is no longer present in formatting toolbar
+    expect(screen.queryByTitle(/Current Screenplay Element/i)).not.toBeInTheDocument();
+    expect(screen.queryByTitle(/Element selector disabled/i)).not.toBeInTheDocument();
   });
 });

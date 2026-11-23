@@ -55,8 +55,8 @@ describe('Phase 1: Project Lifecycle & Data Model (W1 & W1b)', () => {
       expect(mainDraft.blocks[0].type).toBe('action');
       expect(mainDraft.blocks[0].text).toBe('');
 
-      // Paper default: US Letter (PAGE-01, DEC-014)
-      expect(project.settings.paperSize).toBe('letter');
+      // Paper default: A4 (PAGE-01, DEC-014, V1.8)
+      expect(project.settings.paperSize).toBe('a4');
 
       // Spellcheck off by default (DEC-020)
       expect(project.settings.spellcheck).toBe(false);

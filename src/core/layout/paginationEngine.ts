@@ -453,7 +453,7 @@ export class PaginationEngine implements IPaginationEngine {
     }
 
     // Resolve profile
-    const profile = options?.profile ?? createPageProfile(options?.paperSize ?? 'letter');
+    const profile = options?.profile ?? createPageProfile(options?.paperSize ?? 'a4');
     validatePageProfile(profile);
 
     const spacing = options?.spacingRules ?? DEFAULT_SPACING_RULES;
@@ -1198,8 +1198,8 @@ export class PaginationEngine implements IPaginationEngine {
   private getElementPrintableWidth(type: ScreenplayBlockType, printableWidthPt: number): number {
     switch (type) {
       case 'character':
-        // Left margin: 2.2in (158.4pt). Printable width: 432 - 158.4 = 273.6pt
-        return Math.max(100.0, printableWidthPt - 158.4);
+        // Centered across full printable width of screenplay writing area
+        return printableWidthPt;
       case 'parenthetical':
         // Left margin: 1.6in (115.2pt). Max width: 3.0in (216.0pt)
         return Math.min(216.0, Math.max(100.0, printableWidthPt - 115.2));

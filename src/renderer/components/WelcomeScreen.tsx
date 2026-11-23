@@ -11,7 +11,7 @@
  * - Clear distinction of internal database vs external files
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   FilePlus,
   FolderOpen,
@@ -22,6 +22,8 @@ import {
   ChevronRight,
   X,
   Sparkles,
+  Trash2,
+  FileDown,
 } from 'lucide-react';
 import { AkharStudioLogo } from './AkharStudioLogo';
 import { Tooltip } from './Tooltip';
@@ -38,6 +40,9 @@ interface WelcomeScreenProps {
   onOpenRecent: (project: RecentProject) => void;
   onRestoreBackup: () => void;
   onExportBackup?: () => void;
+  onExportProjectDirectly?: (project: RecentProject, format: 'pdf' | 'fountain' | 'bundle') => void;
+  onSaveAsProjectDirectly?: (project: RecentProject) => void;
+  onDeleteProjectDirectly?: (project: RecentProject) => void;
   canDismiss?: boolean;
   onDismiss?: () => void;
 }
@@ -51,21 +56,59 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   onOpenRecent,
   onRestoreBackup,
   onExportBackup,
+  onExportProjectDirectly,
+  onSaveAsProjectDirectly,
+  onDeleteProjectDirectly,
   canDismiss = true,
   onDismiss = () => {},
 }) => {
   const dialogRef = useRef<HTMLDivElement>(null);
+  const contextMenuRef = useRef<HTMLDivElement>(null);
   const { mounted, scrimClassName } = useModalTransition(isOpen);
+
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    project: RecentProject;
+  } | null>(null);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && canDismiss) {
-        onDismiss();
+      if (e.key === 'Escape') {
+        if (contextMenu) {
+          setContextMenu(null);
+          return;
+        }
+        if (canDismiss) {
+          onDismiss();
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [canDismiss, onDismiss]);
+  }, [canDismiss, onDismiss, contextMenu]);
+
+  useEffect(() => {
+    const handleOutside = (e: MouseEvent) => {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
+        setContextMenu(null);
+      }
+    };
+    if (contextMenu) {
+      document.addEventListener('mousedown', handleOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleOutside);
+  }, [contextMenu]);
+
+  const handleContextMenu = (e: React.MouseEvent, rec: RecentProject) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const menuWidth = 220;
+    const menuHeight = 220;
+    const x = Math.min(e.clientX, window.innerWidth - menuWidth - 10);
+    const y = Math.min(e.clientY, window.innerHeight - menuHeight - 10);
+    setContextMenu({ x, y, project: rec });
+  };
 
   if (!mounted) return null;
 
@@ -227,6 +270,8 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                       key={rec.id + (rec.filePath || '')}
                       type="button"
                       onClick={() => onOpenRecent(rec)}
+                      onContextMenu={(e) => handleContextMenu(e, rec)}
+                      title="Click to open, right-click for options (Export, Save As, Delete)"
                       className="ds-row ds-row--two-line w-full text-left transition-colors group px-3 py-2 border-b last:border-b-0"
                       style={{
                         borderColor: 'var(--line-separator)',
@@ -339,6 +384,128 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Right-Click Context Menu for Projects */}
+      {contextMenu && (
+        <div
+          ref={contextMenuRef}
+          className="ds-menu fixed z-[9999] shadow-2xl animate-in fade-in-0 zoom-in-95 duration-100"
+          style={{
+            left: `${contextMenu.x}px`,
+            top: `${contextMenu.y}px`,
+            minWidth: '220px',
+            background: 'var(--surface-overlay)',
+            borderColor: 'var(--line-separator)',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Project Title Header */}
+          <div
+            className="px-3 py-1.5 text-[11px] font-mono truncate border-b select-none"
+            style={{
+              color: 'var(--text-secondary)',
+              borderColor: 'var(--line-separator)',
+            }}
+          >
+            {contextMenu.project.title || 'Untitled Screenplay'}
+          </div>
+
+          {/* Open */}
+          <button
+            type="button"
+            className="ds-row w-full text-left"
+            onClick={() => {
+              const rec = contextMenu.project;
+              setContextMenu(null);
+              onOpenRecent(rec);
+            }}
+          >
+            <FolderOpen className="ds-row__icon" size={14} />
+            <span className="ds-row__label text-xs">Open Screenplay</span>
+          </button>
+
+          <div className="ds-menu__sep" />
+
+          {/* Export Options */}
+          {onExportProjectDirectly && (
+            <>
+              <button
+                type="button"
+                className="ds-row w-full text-left"
+                onClick={() => {
+                  const rec = contextMenu.project;
+                  setContextMenu(null);
+                  onExportProjectDirectly(rec, 'pdf');
+                }}
+              >
+                <FileText className="ds-row__icon" size={14} />
+                <span className="ds-row__label text-xs">Export as PDF...</span>
+              </button>
+
+              <button
+                type="button"
+                className="ds-row w-full text-left"
+                onClick={() => {
+                  const rec = contextMenu.project;
+                  setContextMenu(null);
+                  onExportProjectDirectly(rec, 'fountain');
+                }}
+              >
+                <FileDown className="ds-row__icon" size={14} />
+                <span className="ds-row__label text-xs">Export as Fountain (.fountain)...</span>
+              </button>
+
+              <button
+                type="button"
+                className="ds-row w-full text-left"
+                onClick={() => {
+                  const rec = contextMenu.project;
+                  setContextMenu(null);
+                  onExportProjectDirectly(rec, 'bundle');
+                }}
+              >
+                <Download className="ds-row__icon" size={14} />
+                <span className="ds-row__label text-xs">Export Project Bundle...</span>
+              </button>
+            </>
+          )}
+
+          {/* Save As */}
+          {onSaveAsProjectDirectly && (
+            <button
+              type="button"
+              className="ds-row w-full text-left"
+              onClick={() => {
+                const rec = contextMenu.project;
+                setContextMenu(null);
+                onSaveAsProjectDirectly(rec);
+              }}
+            >
+              <Download className="ds-row__icon" size={14} />
+              <span className="ds-row__label text-xs">Save As...</span>
+            </button>
+          )}
+
+          <div className="ds-menu__sep" />
+
+          {/* Delete Project */}
+          {onDeleteProjectDirectly && (
+            <button
+              type="button"
+              className="ds-row w-full text-left group"
+              style={{ color: 'var(--text-danger)' }}
+              onClick={() => {
+                const rec = contextMenu.project;
+                setContextMenu(null);
+                onDeleteProjectDirectly(rec);
+              }}
+            >
+              <Trash2 className="ds-row__icon" size={14} style={{ color: 'var(--text-danger)' }} />
+              <span className="ds-row__label text-xs font-medium">Delete Screenplay</span>
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 };

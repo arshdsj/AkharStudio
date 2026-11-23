@@ -611,7 +611,8 @@ export function generateUnifiedScreenplayPdfHtml(
     }
 
     .character {
-      margin-left: 2.2in;
+      margin-left: 0;
+      text-align: center;
       margin-top: ${effectivePitchPx}px;
       margin-bottom: 0;
       text-transform: uppercase;
@@ -636,10 +637,12 @@ export function generateUnifiedScreenplayPdfHtml(
     }
 
     .transition {
-      margin-left: 4.0in;
+      margin-left: 0;
+      text-align: right;
       margin-top: ${effectivePitchPx}px;
       margin-bottom: ${effectivePitchPx}px;
       text-transform: uppercase;
+      font-weight: bold;
       overflow: visible;
     }
 
@@ -664,7 +667,8 @@ export function generateUnifiedScreenplayPdfHtml(
     }
 
     .screenplay-contd-continuation {
-      margin-left: 2.2in;
+      margin-left: 0;
+      text-align: center;
       font-weight: bold;
       text-transform: uppercase;
       margin-top: 0;

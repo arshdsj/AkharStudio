@@ -6,7 +6,8 @@
 import fs from 'fs';
 import path from 'path';
 import { ScriptProject, RecentProject, RecoverySnapshot } from '../../types/screenplay';
-import { validateScriptProject } from '../model/ProjectModel';
+import { validateScriptProject, CURRENT_SCHEMA_VERSION, generateId } from '../model/ProjectModel';
+import { importFromFountain } from '../export/fountainImporter';
 
 export class FileSystemManager {
   private recoveryDir: string;
@@ -71,7 +72,7 @@ export class FileSystemManager {
   }
 
   /**
-   * Open and Validate Project from Disk (STORE-01, ARCH-05, T-16)
+   * Open and Validate Project from Disk (STORE-01, ARCH-05, T-16, Fountain support)
    */
   async openProject(filePath: string): Promise<ScriptProject> {
     if (!fs.existsSync(filePath)) {
@@ -80,10 +81,75 @@ export class FileSystemManager {
 
     try {
       const content = await fs.promises.readFile(filePath, 'utf-8');
-      const parsed = JSON.parse(content);
-      const validated = validateScriptProject(parsed);
-      await this.recordRecentProject(filePath, validated);
-      return validated;
+
+      // Native .fountain Screenplay support
+      if (filePath.toLowerCase().endsWith('.fountain')) {
+        const { metadata, draft } = importFromFountain(content);
+        const titleFromFilename = path.basename(filePath, path.extname(filePath));
+        const title =
+          metadata.title && metadata.title !== 'Untitled Screenplay'
+            ? metadata.title
+            : titleFromFilename || 'Imported Screenplay';
+        metadata.title = title;
+
+        const fountainProject: ScriptProject = {
+          schemaVersion: CURRENT_SCHEMA_VERSION,
+          id: generateId(),
+          title,
+          metadata,
+          settings: {
+            paperSize: 'a4',
+            contdSetting: 'none',
+            language: 'pa',
+            spellcheck: false,
+          },
+          drafts: [draft],
+          activeDraftId: draft.id,
+          revision: 1,
+          lastSavedRevision: 1,
+        };
+        await this.recordRecentProject(filePath, fountainProject);
+        return fountainProject;
+      }
+
+      // Try JSON project format
+      try {
+        const parsed = JSON.parse(content);
+        const validated = validateScriptProject(parsed);
+        await this.recordRecentProject(filePath, validated);
+        return validated;
+      } catch (jsonErr) {
+        // Fallback: If not JSON, try parsing as Fountain text
+        if (content.trim()) {
+          const { metadata, draft } = importFromFountain(content);
+          const titleFromFilename = path.basename(filePath, path.extname(filePath));
+          const title =
+            metadata.title && metadata.title !== 'Untitled Screenplay'
+              ? metadata.title
+              : titleFromFilename || 'Imported Screenplay';
+          metadata.title = title;
+
+          const fountainProject: ScriptProject = {
+            schemaVersion: CURRENT_SCHEMA_VERSION,
+            id: generateId(),
+            title,
+            metadata,
+            settings: {
+              paperSize: 'a4',
+              contdSetting: 'none',
+              language: 'pa',
+              spellcheck: false,
+            },
+            drafts: [draft],
+            activeDraftId: draft.id,
+            revision: 1,
+            lastSavedRevision: 1,
+          };
+          await this.recordRecentProject(filePath, fountainProject);
+          return fountainProject;
+        }
+        throw jsonErr;
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       throw new Error(`Unable to load project from ${filePath}: ${message}`);

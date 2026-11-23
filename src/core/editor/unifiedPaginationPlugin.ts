@@ -110,7 +110,7 @@ export interface UnifiedPaginationState {
  */
 export function createUnifiedPageBreakDOM(
   target: PageBreakDecorationTarget,
-  paperSize: PaperSize = 'letter'
+  paperSize: PaperSize = 'a4'
 ): HTMLElement {
   const container = document.createElement('div');
   container.className = `screenplay-page-break screenplay-unified-page-break select-none ${
@@ -169,7 +169,7 @@ export function createUnifiedPageBreakDOM(
  */
 export function createUnifiedMidBlockBreakDOM(
   target: PageBreakDecorationTarget,
-  paperSize: PaperSize = 'letter'
+  paperSize: PaperSize = 'a4'
 ): HTMLElement {
   const container = document.createElement('div');
   container.className = `screenplay-page-break screenplay-unified-page-break screenplay-mid-block-break select-none ${
@@ -248,7 +248,7 @@ export function createUnifiedMidBlockBreakDOM(
  */
 export function createFallbackPageBreakDOM(
   pageNumber: number,
-  paperSize: PaperSize = 'letter',
+  paperSize: PaperSize = 'a4',
   reason?: string
 ): HTMLElement {
   const container = document.createElement('div');
@@ -329,7 +329,7 @@ export function createFallbackPageBreakDOM(
  */
 export function computeUnifiedDegradedDecorations(
   doc: PMNode,
-  paperSize: PaperSize = 'letter',
+  paperSize: PaperSize = 'a4',
   contdSetting: ContdSetting = 'none',
   reason: NonNullable<UnifiedFallbackReason> | string = 'engine_error',
   onFallback?: (reason: NonNullable<UnifiedFallbackReason>, diagnostics: UnifiedPluginDiagnostic[]) => void,
@@ -499,7 +499,7 @@ function resolveDefaultLayoutService(provided?: ITextLayoutService): ITextLayout
 export function createUnifiedPaginationPlugin(
   options: UnifiedPaginationPluginOptions = {}
 ): Plugin<UnifiedPaginationState> {
-  const initialPaperSize: PaperSize = options.paperSize || 'letter';
+  const initialPaperSize: PaperSize = options.paperSize || 'a4';
   const initialContdSetting: ContdSetting = options.contdSetting || 'on';
   let layoutService = resolveDefaultLayoutService(options.textLayoutService);
   const engine = options.paginationEngine || createPaginationEngine();

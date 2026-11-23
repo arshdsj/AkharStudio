@@ -116,7 +116,7 @@ export function generatePaginationPreview(
   document: ScriptDraft | PMNode,
   options?: PaginationPreviewOptions
 ): PaginationPreviewReport {
-  const paperSize: PaperSize = options?.paperSize ?? 'letter';
+  const paperSize: PaperSize = options?.paperSize ?? 'a4';
   const profile = createPageProfile(paperSize);
 
   // Setup M1 layout stack

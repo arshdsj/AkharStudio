@@ -147,8 +147,9 @@ describe('AkharStudio Enhancements Test Suite', () => {
       const characterCss = characterCssMatch![1];
       expect(characterCss).toContain('font-weight: bold');
 
-      // Verify character indentation and alignment is preserved
-      expect(characterCss).toContain('margin-left: 2.2in');
+      // Verify character indentation and alignment is genuinely centre-aligned
+      expect(characterCss).toContain('text-align: center');
+      expect(characterCss).toContain('margin-left: 0');
       expect(characterCss).toContain('text-transform: uppercase');
 
       // Verify dialogue body does NOT have font-weight: bold
@@ -192,7 +193,7 @@ describe('AkharStudio Enhancements Test Suite', () => {
   // =========================================================================
   describe('2. About Section & Version Numbering', () => {
     it('centralizes version as current APP_VERSION and author as Arsh DSJ', () => {
-      expect(APP_VERSION).toBe('1.7');
+      expect(APP_VERSION).toBe('1.8');
       expect(APP_AUTHOR).toBe('Arsh DSJ');
     });
 

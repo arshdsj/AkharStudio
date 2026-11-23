@@ -8,6 +8,10 @@ This app has a fixed design system: `tokens.css`, `components.css`, `design-syst
 - Build with `ds-` primitives. If a primitive is missing, add it to `components.css` using tokens, then use it.
 - Panels use `.ds-panel` (320px, header 40, tab bar 36, body padding 16, section gap 24). Tabs never change panel size; empty states fill the body.
 - Dialogs use `.ds-dialog`: title, sections, footer with Cancel + one primary button on the right.
+- Floating tool surfaces use `.ds-palette`; their buttons use `.ds-tool`. No bordered pills.
+- The active tool is a tint plus an accent icon, never a solid accent fill.
+- Tools are icon-only with a one-line tooltip (name + shortcut); never put a text micro-label inside a palette.
+- Palette controls never take focus from the editor on click.
 - Selection is shown by fill. Groups are separated by spacing and a section title.
 - Every interactive element has hover, pressed, focus-visible and disabled states from the shared recipe.
 - Exactly one accent-filled (primary) button per view.

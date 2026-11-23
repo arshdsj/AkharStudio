@@ -146,6 +146,16 @@ export const HeaderRow2: React.FC<HeaderRow2Props> = ({
         <div className="ds-seg" role="radiogroup" aria-label="Paper format" style={{ width: '160px' }}>
           <button
             type="button"
+            onClick={() => onPaperSizeChange('a4')}
+            className="ds-seg__item"
+            role="radio"
+            aria-checked={paperSize === 'a4'}
+            title="Standard A4 (210 × 297 mm) format (Default)"
+          >
+            A4
+          </button>
+          <button
+            type="button"
             onClick={() => onPaperSizeChange('letter')}
             className="ds-seg__item"
             role="radio"
@@ -153,16 +163,6 @@ export const HeaderRow2: React.FC<HeaderRow2Props> = ({
             title="Standard US Letter (8.5 × 11 in) format"
           >
             Letter
-          </button>
-          <button
-            type="button"
-            onClick={() => onPaperSizeChange('a4')}
-            className="ds-seg__item"
-            role="radio"
-            aria-checked={paperSize === 'a4'}
-            title="Standard A4 (210 × 297 mm) format (DEC-014)"
-          >
-            A4
           </button>
         </div>
 

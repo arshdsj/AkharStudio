@@ -2,6 +2,8 @@
 @import './styles/tokens.css';
 @import './styles/components.css';
 @import './styles/themes.css';
+@import './styles/motion.css';
+@import './styles/toolrail.css';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -289,7 +291,8 @@
   font-weight: bold;
   text-transform: uppercase;
   color: var(--text-primary);
-  margin-left: 3.7in; /* Aligns exactly with character cue (1.5in paper padding + 2.2in character margin) */
+  text-align: center;
+  margin-left: 0;
   margin-top: 8pt;
   margin-bottom: 4pt;
   user-select: none;
@@ -298,7 +301,7 @@
 }
 
 .paper-a4 .screenplay-contd-continuation {
-  margin-left: calc(38.1mm + 2.2in);
+  margin-left: 0;
 }
 
 /* Screenplay Element Indentations & Target Geometry (Generated from screenplayGeometry.ts) */
@@ -337,9 +340,10 @@
 .ProseMirror .block-character {
   font-weight: bold;
   text-transform: uppercase;
+  text-align: center;
   margin-top: var(--screenplay-line-pitch, 20px);
   margin-bottom: 0;
-  margin-left: 2.2in;
+  margin-left: 0;
   letter-spacing: 0.5px;
   line-height: var(--screenplay-line-pitch, 20px);
   font-size: 16px;
@@ -371,7 +375,8 @@
   text-transform: uppercase;
   margin-top: var(--screenplay-line-pitch, 20px);
   margin-bottom: var(--screenplay-line-pitch, 20px);
-  margin-left: 4.0in;
+  margin-left: 0;
+  text-align: right;
   line-height: var(--screenplay-line-pitch, 20px);
   font-size: 16px;
   overflow: visible;

@@ -5,15 +5,16 @@
  */
 
 import React, { useEffect, useRef } from 'react';
-import {
-  Clapperboard,
-  Film,
-  User,
-  Quote,
-  ArrowRight,
-  Camera,
-} from 'lucide-react';
 import { ScreenplayBlockType } from '../../types/screenplay';
+import {
+  SceneHeadingIcon,
+  ActionIcon,
+  CharacterIcon,
+  ParentheticalIcon,
+  DialogueIcon,
+  ShotIcon,
+  TransitionIcon,
+} from './icons/ScreenplayElementIcons';
 
 interface ElementPickerOption {
   type: ScreenplayBlockType;
@@ -29,49 +30,49 @@ export const ELEMENT_PICKER_OPTIONS: ElementPickerOption[] = [
     label: 'Scene Heading',
     badge: 'S',
     shortcut: '1',
-    icon: <Clapperboard size={14} />,
+    icon: <SceneHeadingIcon size={14} />,
   },
   {
     type: 'action',
     label: 'Action',
     badge: 'A',
     shortcut: '2',
-    icon: <Film size={14} />,
+    icon: <ActionIcon size={14} />,
   },
   {
     type: 'character',
     label: 'Character',
     badge: 'C',
     shortcut: '3',
-    icon: <User size={14} />,
+    icon: <CharacterIcon size={14} />,
   },
   {
     type: 'parenthetical',
     label: 'Parenthetical',
     badge: 'P',
     shortcut: '4',
-    icon: <span className="font-bold text-xs">( )</span>,
+    icon: <ParentheticalIcon size={14} />,
   },
   {
     type: 'dialogue',
     label: 'Dialogue',
     badge: 'D',
     shortcut: '5',
-    icon: <Quote size={14} />,
+    icon: <DialogueIcon size={14} />,
   },
   {
     type: 'shot',
     label: 'Shot',
     badge: 'SH',
     shortcut: '6',
-    icon: <Camera size={14} />,
+    icon: <ShotIcon size={14} />,
   },
   {
     type: 'transition',
     label: 'Transition',
     badge: 'T',
     shortcut: '7',
-    icon: <ArrowRight size={14} />,
+    icon: <TransitionIcon size={14} />,
   },
 ];
 

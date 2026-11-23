@@ -1,6 +1,6 @@
 {
   "name": "akhar-studio",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "type": "module",
   "private": true,
   "description": "Desktop-first, local-first Punjabi screenplay editor",
@@ -45,6 +45,12 @@
         "ext": "scriptproject",
         "name": "Punjabi Script Project",
         "description": "Punjabi Screenplay Editor Project Bundle",
+        "role": "Editor"
+      },
+      {
+        "ext": "fountain",
+        "name": "Fountain Screenplay",
+        "description": "Fountain Screenplay Document",
         "role": "Editor"
       }
     ],

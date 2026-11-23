@@ -46,7 +46,7 @@ export interface TransliterationDiagnosticEvent {
   rawCandidatesCount?: number;
   selectedCandidate?: string;
   selectedIndex?: number;
-  selectionMethod?: 'space' | 'enter' | 'click' | 'punctuation' | 'arrow_nav' | 'fallback_literal';
+  selectionMethod?: 'space' | 'enter' | 'click' | 'punctuation' | 'arrow_nav' | 'fallback_literal' | 'shift_space' | 'shift_enter';
   committedText?: string;
   docPosition?: number;
   issueNote?: string;
@@ -291,7 +291,7 @@ export class DiagnosticRecorder {
     romanInput: string,
     committedText: string,
     docPosition?: number,
-    selectionMethod?: 'space' | 'enter' | 'click' | 'punctuation' | 'arrow_nav' | 'fallback_literal'
+    selectionMethod?: 'space' | 'enter' | 'click' | 'punctuation' | 'arrow_nav' | 'fallback_literal' | 'shift_space' | 'shift_enter'
   ): TransliterationDiagnosticEvent | null {
     if (!this.isRecordingActive || !this.activeSession) return null;
 

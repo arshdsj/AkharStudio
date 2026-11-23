@@ -4,19 +4,24 @@
 
 import '@testing-library/jest-dom/vitest';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
 import {
   RightFormattingToolbar,
   FORMATTING_TOOLBAR_OPTIONS,
 } from '../src/renderer/components/RightFormattingToolbar';
 import { ScreenplayBlock } from '../src/types/screenplay';
 
-describe('RightFormattingToolbar - Contextual Right-Side Formatting Toolbar', () => {
+describe('RightFormattingToolbar - Claude Element Rail Redesign', () => {
   beforeEach(() => {
     localStorage.clear();
+    vi.useFakeTimers();
   });
 
   afterEach(() => {
+    act(() => {
+      vi.runOnlyPendingTimers();
+    });
+    vi.useRealTimers();
     cleanup();
     localStorage.clear();
   });
@@ -33,7 +38,7 @@ describe('RightFormattingToolbar - Contextual Right-Side Formatting Toolbar', ()
     text: 'ਜੋ ਕੁਝ ਵੀ ਹੁੰਦਾ ਹੈ, ਉਹ ਸਭ ਕੁਝ ਪਹਿਲਾਂ ਤੋਂ ਹੀ ਲਿਖਿਆ ਹੋਇਆ ਹੈ।',
   };
 
-  it('renders expanded toolbar with header, collapse button, and all 7 screenplay tools by default', () => {
+  it('renders expanded palette surface with radiogroup, no FORMAT header, collapse control at bottom, and all 7 screenplay tools', () => {
     const onSelectBlockType = vi.fn();
     const onKeepFocus = vi.fn();
 
@@ -46,39 +51,47 @@ describe('RightFormattingToolbar - Contextual Right-Side Formatting Toolbar', ()
       />
     );
 
-    const toolbar = screen.getByRole('toolbar', { name: /Screenplay Formatting/i });
-    expect(toolbar).toBeInTheDocument();
-    expect(toolbar).toHaveClass('ds-right-toolbar');
+    // Palette & Rail container
+    const nav = screen.getByRole('toolbar', { name: /Screenplay Formatting/i });
+    expect(nav).toBeInTheDocument();
+    expect(nav).toHaveClass('ds-palette');
+    expect(nav).toHaveClass('ds-rail');
 
-    // Header label
-    expect(screen.getByText('FORMAT')).toBeInTheDocument();
+    // No FORMAT heading (per redesign spec)
+    expect(screen.queryByText('FORMAT')).not.toBeInTheDocument();
 
-    // Collapse button
-    const collapseBtn = screen.getByRole('button', { name: /Collapse formatting toolbar/i });
+    // Radiogroup semantics
+    const radiogroup = screen.getByRole('radiogroup', { name: /Element type/i });
+    expect(radiogroup).toBeInTheDocument();
+
+    // Collapse button at bottom
+    const collapseBtn = screen.getByRole('button', { name: /Hide element types/i });
     expect(collapseBtn).toBeInTheDocument();
     expect(collapseBtn).toHaveAttribute('aria-expanded', 'true');
+    expect(collapseBtn).toHaveAttribute('data-rail-collapse');
 
-    // Check all 7 tools
+    // Check all 7 tools with role="radio"
     FORMATTING_TOOLBAR_OPTIONS.forEach((opt) => {
-      const btn = screen.getByRole('button', { name: new RegExp(opt.label, 'i') });
-      expect(btn).toBeInTheDocument();
-      expect(btn).toHaveAttribute('data-tool-type', opt.type);
+      const radio = screen.getByRole('radio', { name: new RegExp(opt.label, 'i') });
+      expect(radio).toBeInTheDocument();
+      expect(radio).toHaveAttribute('data-tool-type', opt.type);
+      expect(radio).toHaveAttribute('data-el', opt.type);
     });
 
-    // Action button should have active state because activeBlock is action
-    const actionBtn = screen.getByRole('button', { name: /Action/i });
-    expect(actionBtn).toHaveAttribute('data-active', 'true');
-    expect(actionBtn).toHaveAttribute('aria-pressed', 'true');
-    expect(actionBtn).toHaveClass('is-active');
+    // Action radio button should have active state because activeBlock is action
+    const actionRadio = screen.getByRole('radio', { name: /Action/i });
+    expect(actionRadio).toHaveAttribute('data-active', 'true');
+    expect(actionRadio).toHaveAttribute('aria-checked', 'true');
+    expect(actionRadio).toHaveClass('is-active');
 
     // Dialogue button should not be active
-    const dialogueBtn = screen.getByRole('button', { name: /Dialogue/i });
-    expect(dialogueBtn).toHaveAttribute('data-active', 'false');
-    expect(dialogueBtn).toHaveAttribute('aria-pressed', 'false');
-    expect(dialogueBtn).not.toHaveClass('is-active');
+    const dialogueRadio = screen.getByRole('radio', { name: /Dialogue/i });
+    expect(dialogueRadio).toHaveAttribute('data-active', 'false');
+    expect(dialogueRadio).toHaveAttribute('aria-checked', 'false');
+    expect(dialogueRadio).not.toHaveClass('is-active');
   });
 
-  it('updates active state dynamically when activeBlock changes', () => {
+  it('updates active state dynamically and smoothly when activeBlock changes', () => {
     const { rerender } = render(
       <RightFormattingToolbar
         activeBlock={mockActionBlock}
@@ -87,8 +100,8 @@ describe('RightFormattingToolbar - Contextual Right-Side Formatting Toolbar', ()
       />
     );
 
-    expect(screen.getByRole('button', { name: /Action/i })).toHaveAttribute('data-active', 'true');
-    expect(screen.getByRole('button', { name: /Dialogue/i })).toHaveAttribute('data-active', 'false');
+    expect(screen.getByRole('radio', { name: /Action/i })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: /Dialogue/i })).toHaveAttribute('aria-checked', 'false');
 
     // Change to dialogue block
     rerender(
@@ -99,8 +112,27 @@ describe('RightFormattingToolbar - Contextual Right-Side Formatting Toolbar', ()
       />
     );
 
-    expect(screen.getByRole('button', { name: /Action/i })).toHaveAttribute('data-active', 'false');
-    expect(screen.getByRole('button', { name: /Dialogue/i })).toHaveAttribute('data-active', 'true');
+    expect(screen.getByRole('radio', { name: /Action/i })).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByRole('radio', { name: /Dialogue/i })).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('clears active state across all individual tools when isMixedSelection is true', () => {
+    render(
+      <RightFormattingToolbar
+        activeBlock={mockActionBlock}
+        isMixedSelection={true}
+        isTitleEditing={false}
+        onSelectBlockType={vi.fn()}
+      />
+    );
+
+    // No radio button should be checked
+    FORMATTING_TOOLBAR_OPTIONS.forEach((opt) => {
+      const radio = screen.getByRole('radio', { name: new RegExp(opt.label, 'i') });
+      expect(radio).toHaveAttribute('aria-checked', 'false');
+      expect(radio).toHaveAttribute('data-active', 'false');
+      expect(radio).not.toHaveClass('is-active');
+    });
   });
 
   it('calls onSelectBlockType and onKeepFocus when clicking a tool button', () => {
@@ -116,8 +148,8 @@ describe('RightFormattingToolbar - Contextual Right-Side Formatting Toolbar', ()
       />
     );
 
-    const characterBtn = screen.getByRole('button', { name: /Character/i });
-    fireEvent.click(characterBtn);
+    const characterRadio = screen.getByRole('radio', { name: /Character/i });
+    fireEvent.click(characterRadio);
 
     expect(onSelectBlockType).toHaveBeenCalledWith('character');
     expect(onKeepFocus).toHaveBeenCalled();
@@ -132,17 +164,17 @@ describe('RightFormattingToolbar - Contextual Right-Side Formatting Toolbar', ()
       />
     );
 
-    const dialogueBtn = screen.getByRole('button', { name: /Dialogue/i });
+    const dialogueRadio = screen.getByRole('radio', { name: /Dialogue/i });
     const mouseDownEvent = new MouseEvent('mousedown', { cancelable: true, bubbles: true });
-    dialogueBtn.dispatchEvent(mouseDownEvent);
+    dialogueRadio.dispatchEvent(mouseDownEvent);
     expect(mouseDownEvent.defaultPrevented).toBe(true);
 
     const pointerDownEvent = new PointerEvent('pointerdown', { cancelable: true, bubbles: true });
-    dialogueBtn.dispatchEvent(pointerDownEvent);
+    dialogueRadio.dispatchEvent(pointerDownEvent);
     expect(pointerDownEvent.defaultPrevented).toBe(true);
   });
 
-  it('displays contextual tooltip on hover with tool name, shortcut, and description', () => {
+  it('displays compact one-line tooltip on hover with name and shortcut, revealing description after 900ms', () => {
     render(
       <RightFormattingToolbar
         activeBlock={mockActionBlock}
@@ -151,22 +183,42 @@ describe('RightFormattingToolbar - Contextual Right-Side Formatting Toolbar', ()
       />
     );
 
-    const dialogueBtn = screen.getByRole('button', { name: /Dialogue/i });
+    const dialogueRadio = screen.getByRole('radio', { name: /Dialogue/i });
 
-    // Hover
-    fireEvent.mouseEnter(dialogueBtn);
+    // Pointer enter (400ms delay)
+    fireEvent.pointerEnter(dialogueRadio);
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+
+    // Advance 400ms: tooltip appears with name and shortcut
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
 
     const tooltip = screen.getByRole('tooltip');
     expect(tooltip).toBeInTheDocument();
     expect(tooltip).toHaveTextContent('Dialogue');
-    expect(tooltip).toHaveTextContent('Spoken lines. Applies to the selection or the line at your cursor.');
+    expect(tooltip).not.toHaveClass('is-detail');
 
-    // Mouse leave
-    fireEvent.mouseLeave(dialogueBtn);
+    // Verify expander container is ready for progressive disclosure
+    const expander = tooltip.querySelector('.ds-tip__expander');
+    expect(expander).toBeInTheDocument();
+
+    // Advance to 900ms: description is revealed within the EXACT SAME DOM element
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    const detailedTooltip = screen.getByRole('tooltip');
+    expect(detailedTooltip).toBe(tooltip); // Must remain the same mounted element
+    expect(detailedTooltip).toHaveClass('is-detail');
+    expect(detailedTooltip).toHaveTextContent('What the character says.');
+    expect(detailedTooltip.querySelector('.ds-tip__desc')).toHaveTextContent('What the character says.');
+
+    // Pointer leave dismisses tooltip immediately
+    fireEvent.pointerLeave(dialogueRadio);
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
   });
 
-  it('displays tooltip on keyboard focus and dismisses on blur', () => {
+  it('displays tooltip on keyboard focus immediately and dismisses on blur', () => {
     render(
       <RightFormattingToolbar
         activeBlock={mockActionBlock}
@@ -175,17 +227,23 @@ describe('RightFormattingToolbar - Contextual Right-Side Formatting Toolbar', ()
       />
     );
 
-    const sceneBtn = screen.getByRole('button', { name: /Scene Heading/i });
+    const sceneRadio = screen.getByRole('radio', { name: /Scene Heading/i });
 
-    fireEvent.focus(sceneBtn);
+    // Mock :focus-visible match
+    sceneRadio.matches = vi.fn().mockImplementation((sel) => sel === ':focus-visible');
+
+    fireEvent.focus(sceneRadio);
+    act(() => {
+      vi.advanceTimersByTime(0);
+    });
+
     expect(screen.getByRole('tooltip')).toHaveTextContent('Scene Heading');
-    expect(screen.getByRole('tooltip')).toHaveTextContent('Location and time of day');
 
-    fireEvent.blur(sceneBtn);
+    fireEvent.blur(sceneRadio);
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
   });
 
-  it('collapses when collapse button is clicked, persists to localStorage, and shows expand toggle', () => {
+  it('collapses to a single chip showing current active element, persists to localStorage, and expands on click', () => {
     const onCollapseChange = vi.fn();
 
     render(
@@ -197,31 +255,49 @@ describe('RightFormattingToolbar - Contextual Right-Side Formatting Toolbar', ()
       />
     );
 
-    const collapseBtn = screen.getByRole('button', { name: /Collapse formatting toolbar/i });
+    const collapseBtn = screen.getByRole('button', { name: /Hide element types/i });
     fireEvent.click(collapseBtn);
+
+    // Fast-forward animation timeout (140ms pop-out)
+    act(() => {
+      vi.advanceTimersByTime(150);
+    });
 
     expect(onCollapseChange).toHaveBeenCalledWith(true);
     expect(localStorage.getItem('akhar_format_toolbar_collapsed')).toBe('true');
 
-    // Expanded toolbar should be gone
-    expect(screen.queryByRole('toolbar')).not.toBeInTheDocument();
+    // Expanded radiogroup should be gone
+    expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument();
 
-    // Subtle expand toggle button should now be visible
-    const expandBtn = screen.getByRole('button', { name: /Expand formatting toolbar/i });
-    expect(expandBtn).toBeInTheDocument();
-    expect(expandBtn).toHaveAttribute('aria-expanded', 'false');
+    // Collapsed chip button should be visible displaying the active element info
+    const chipBtn = screen.getByRole('button', { name: /Show element types/i });
+    expect(chipBtn).toBeInTheDocument();
+    expect(chipBtn).toHaveAttribute('aria-expanded', 'false');
+    expect(chipBtn.getAttribute('aria-label')).toContain('Action');
 
-    // Hover on expand toggle shows expand tooltip
-    fireEvent.mouseEnter(expandBtn);
-    expect(screen.getByRole('tooltip')).toHaveTextContent('Expand formatting toolbar');
-
-    // Click expand button to restore
-    fireEvent.click(expandBtn);
+    // Click chip button to expand and restore
+    fireEvent.click(chipBtn);
     expect(onCollapseChange).toHaveBeenCalledWith(false);
     expect(localStorage.getItem('akhar_format_toolbar_collapsed')).toBe('false');
 
-    // Expanded toolbar is restored
-    expect(screen.getByRole('toolbar', { name: /Screenplay Formatting/i })).toBeInTheDocument();
+    // Expanded rail is restored
+    expect(screen.getByRole('radiogroup', { name: /Element type/i })).toBeInTheDocument();
+  });
+
+  it('displays mixed selection icon on collapsed chip when isMixedSelection is true', () => {
+    render(
+      <RightFormattingToolbar
+        activeBlock={mockActionBlock}
+        isMixedSelection={true}
+        defaultCollapsed={true}
+        isTitleEditing={false}
+        onSelectBlockType={vi.fn()}
+      />
+    );
+
+    const chipBtn = screen.getByRole('button', { name: /Show element types/i });
+    expect(chipBtn).toBeInTheDocument();
+    expect(chipBtn.getAttribute('aria-label')).toContain('Mixed');
   });
 
   it('initializes in collapsed state when localStorage has akhar_format_toolbar_collapsed=true', () => {
@@ -235,11 +311,11 @@ describe('RightFormattingToolbar - Contextual Right-Side Formatting Toolbar', ()
       />
     );
 
-    expect(screen.queryByRole('toolbar')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Expand formatting toolbar/i })).toBeInTheDocument();
+    expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Show element types/i })).toBeInTheDocument();
   });
 
-  it('supports keyboard navigation with ArrowDown, ArrowUp, Home, End, and Escape', () => {
+  it('supports roving tabindex and keyboard navigation with ArrowDown, ArrowUp, Home, End, and Escape', () => {
     const onKeepFocus = vi.fn();
 
     render(
@@ -251,35 +327,38 @@ describe('RightFormattingToolbar - Contextual Right-Side Formatting Toolbar', ()
       />
     );
 
-    const buttons = FORMATTING_TOOLBAR_OPTIONS.map((opt) =>
-      screen.getByRole('button', { name: new RegExp(opt.label, 'i') })
+    const radios = FORMATTING_TOOLBAR_OPTIONS.map((opt) =>
+      screen.getByRole('radio', { name: new RegExp(opt.label, 'i') })
     );
 
-    buttons[0].focus();
-    expect(document.activeElement).toBe(buttons[0]);
+    // Initial roving tabindex: Action is active (index 1), so it has tabIndex=0, others -1
+    expect(radios[1]).toHaveAttribute('tabindex', '0');
+    expect(radios[0]).toHaveAttribute('tabindex', '-1');
 
-    // ArrowDown to move to second button (Action)
-    fireEvent.keyDown(buttons[0], { key: 'ArrowDown' });
-    expect(document.activeElement).toBe(buttons[1]);
+    radios[1].focus();
 
-    // ArrowDown again to move to third button (Character)
-    fireEvent.keyDown(buttons[1], { key: 'ArrowDown' });
-    expect(document.activeElement).toBe(buttons[2]);
+    // ArrowDown to move to Character (index 2)
+    fireEvent.keyDown(radios[1], { key: 'ArrowDown' });
+    expect(radios[2]).toHaveAttribute('tabindex', '0');
 
-    // ArrowUp back to Action
-    fireEvent.keyDown(buttons[2], { key: 'ArrowUp' });
-    expect(document.activeElement).toBe(buttons[1]);
+    // ArrowDown again to move to Parenthetical (index 3)
+    fireEvent.keyDown(radios[2], { key: 'ArrowDown' });
+    expect(radios[3]).toHaveAttribute('tabindex', '0');
 
-    // End to go to last button (Transition)
-    fireEvent.keyDown(buttons[1], { key: 'End' });
-    expect(document.activeElement).toBe(buttons[6]);
+    // ArrowUp back to Character (index 2)
+    fireEvent.keyDown(radios[3], { key: 'ArrowUp' });
+    expect(radios[2]).toHaveAttribute('tabindex', '0');
 
-    // Home to go to first button (Scene Heading)
-    fireEvent.keyDown(buttons[6], { key: 'Home' });
-    expect(document.activeElement).toBe(buttons[0]);
+    // End to move to Transition (last item, index 6)
+    fireEvent.keyDown(radios[2], { key: 'End' });
+    expect(radios[6]).toHaveAttribute('tabindex', '0');
 
-    // Escape restores focus to editor
-    fireEvent.keyDown(buttons[0], { key: 'Escape' });
+    // Home to move to Scene Heading (first item, index 0)
+    fireEvent.keyDown(radios[6], { key: 'Home' });
+    expect(radios[0]).toHaveAttribute('tabindex', '0');
+
+    // Escape returns focus to editor
+    fireEvent.keyDown(radios[0], { key: 'Escape' });
     expect(onKeepFocus).toHaveBeenCalled();
   });
 
@@ -294,15 +373,16 @@ describe('RightFormattingToolbar - Contextual Right-Side Formatting Toolbar', ()
       />
     );
 
-    const actionBtn = screen.getByRole('button', { name: /Action/i });
-    expect(actionBtn).toBeDisabled();
-    expect(actionBtn).toHaveAttribute('aria-disabled', 'true');
+    const actionRadio = screen.getByRole('radio', { name: /Action/i });
+    expect(actionRadio).toBeDisabled();
+    expect(actionRadio).toHaveAttribute('aria-disabled', 'true');
 
     // Click does not trigger formatting change
-    fireEvent.click(actionBtn);
+    fireEvent.click(actionRadio);
     expect(onSelectBlockType).not.toHaveBeenCalled();
 
     // Active state is not shown when editing title
-    expect(actionBtn).toHaveAttribute('data-active', 'false');
+    expect(actionRadio).toHaveAttribute('data-active', 'false');
+    expect(actionRadio).toHaveAttribute('aria-checked', 'false');
   });
 });

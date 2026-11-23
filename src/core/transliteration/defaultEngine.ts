@@ -5,6 +5,7 @@
 
 import { GurmukhiLexicon, UserDictionary } from './lexicon';
 import { CustomDictionary } from './customDictionary';
+import { PersonalizationEngine } from './personalization';
 import { GurmukhiTransliterator } from './engine';
 import rawLexiconData from '../../../assets/data/punjabi_lexicon.json';
 
@@ -13,9 +14,11 @@ globalLexicon.loadEntries(rawLexiconData as [string, number][]);
 
 export const globalUserDict = new UserDictionary();
 export const globalCustomDict = new CustomDictionary();
+export const globalPersonalization = new PersonalizationEngine();
 
 export const defaultTransliterator = new GurmukhiTransliterator(
   globalLexicon,
   globalUserDict,
-  globalCustomDict
+  globalCustomDict,
+  globalPersonalization
 );

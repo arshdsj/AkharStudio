@@ -62,6 +62,19 @@ export function findMatchesInDoc(
       let match: RegExpExecArray | null;
 
       while ((match = regex.exec(text)) !== null) {
+        // Grapheme cluster boundary check: do not start or end on combining marks
+        const firstChar = match[0].slice(0, 1);
+        if (firstChar && /^\p{M}$/u.test(firstChar)) {
+          if (!regex.global) break;
+          continue;
+        }
+
+        const nextChar = text.slice(match.index + match[0].length, match.index + match[0].length + 1);
+        if (nextChar && /^\p{M}$/u.test(nextChar)) {
+          if (!regex.global) break;
+          continue;
+        }
+
         const from = pos + match.index;
         const to = from + match[0].length;
         matches.push({
@@ -114,13 +127,21 @@ export function createSearchPlugin(
             meta.caseSensitive !== undefined ||
             meta.wholeWord !== undefined
           ) {
-            nextState.matches = findMatchesInDoc(
-              newState.doc,
-              nextState.query,
-              nextState.caseSensitive,
-              nextState.wholeWord
-            );
-            nextState.activeIndex = nextState.matches.length > 0 ? 0 : -1;
+            nextState.matches =
+              meta.matches !== undefined
+                ? meta.matches
+                : findMatchesInDoc(
+                    newState.doc,
+                    nextState.query,
+                    nextState.caseSensitive,
+                    nextState.wholeWord
+                  );
+            nextState.activeIndex =
+              meta.activeIndex !== undefined
+                ? meta.activeIndex
+                : nextState.matches.length > 0
+                ? 0
+                : -1;
           }
 
           if (onSearchStateChange) {
@@ -182,6 +203,7 @@ export function createSearchPlugin(
 
 /**
  * Dispatches a transaction to update search parameters.
+ * Automatically activates the first match, synchronizes editor selection, and scrolls into view.
  */
 export function setSearchQuery(
   view: EditorView,
@@ -193,11 +215,29 @@ export function setSearchQuery(
     caseSensitive: false,
     wholeWord: false,
   };
+  const isCase = caseSensitive !== undefined ? caseSensitive : current.caseSensitive;
+  const isWord = wholeWord !== undefined ? wholeWord : current.wholeWord;
+
+  const matches = findMatchesInDoc(view.state.doc, query, isCase, isWord);
+  const activeIndex = matches.length > 0 ? 0 : -1;
+
   const tr = view.state.tr.setMeta(searchPluginKey, {
     query,
-    caseSensitive: caseSensitive !== undefined ? caseSensitive : current.caseSensitive,
-    wholeWord: wholeWord !== undefined ? wholeWord : current.wholeWord,
+    caseSensitive: isCase,
+    wholeWord: isWord,
+    matches,
+    activeIndex,
   });
+
+  if (matches.length > 0) {
+    try {
+      tr.setSelection(TextSelection.create(tr.doc, matches[0].from, matches[0].to));
+      tr.scrollIntoView();
+    } catch {
+      // Fallback if position invalid
+    }
+  }
+
   view.dispatch(tr);
 }
 
@@ -260,4 +300,116 @@ export function clearSearch(view: EditorView) {
     activeIndex: -1,
   });
   view.dispatch(tr);
+}
+
+/**
+ * Replaces the currently active search match with replacement text.
+ * Preserves surrounding formatting, uses editor transaction mechanism,
+ * supports Gurmukhi and empty text, recalculates matches, and advances to next match.
+ */
+export function replaceCurrentMatch(view: EditorView, replacement: string): boolean {
+  const current = searchPluginKey.getState(view.state);
+  if (!current || current.activeIndex < 0 || current.matches.length === 0) {
+    return false;
+  }
+
+  const match = current.matches[current.activeIndex];
+  if (!match) return false;
+
+  const tr = view.state.tr;
+
+  if (replacement.length > 0) {
+    tr.insertText(replacement, match.from, match.to);
+  } else {
+    tr.delete(match.from, match.to);
+  }
+
+  // Recalculate search results after replacement
+  const newMatches = findMatchesInDoc(
+    tr.doc,
+    current.query,
+    current.caseSensitive,
+    current.wholeWord
+  );
+
+  let newIndex = -1;
+  if (newMatches.length > 0) {
+    if (current.activeIndex < newMatches.length) {
+      newIndex = current.activeIndex;
+    } else {
+      newIndex = 0;
+    }
+  }
+
+  tr.setMeta(searchPluginKey, {
+    matches: newMatches,
+    activeIndex: newIndex,
+  });
+
+  if (newIndex >= 0 && newMatches[newIndex]) {
+    const nextMatch = newMatches[newIndex];
+    try {
+      tr.setSelection(TextSelection.create(tr.doc, nextMatch.from, nextMatch.to));
+    } catch {
+      // Fallback if selection couldn't be created
+    }
+    tr.scrollIntoView();
+  }
+
+  view.dispatch(tr);
+  return true;
+}
+
+/**
+ * Replaces all occurrences throughout the document within a single transaction.
+ * Sequential replacements are performed in descending order by document position
+ * to avoid using stale document offsets. Single Undo restores the entire document.
+ */
+export function replaceAllMatches(view: EditorView, replacement: string): number {
+  const current = searchPluginKey.getState(view.state);
+  if (!current || current.matches.length === 0) {
+    return 0;
+  }
+
+  const count = current.matches.length;
+
+  // Descending order prevents position invalidation of earlier matches
+  const sortedMatches = [...current.matches].sort((a, b) => b.from - a.from);
+
+  const tr = view.state.tr;
+
+  for (const match of sortedMatches) {
+    if (replacement.length > 0) {
+      tr.insertText(replacement, match.from, match.to);
+    } else {
+      tr.delete(match.from, match.to);
+    }
+  }
+
+  // Recalculate search results after all replacements
+  const newMatches = findMatchesInDoc(
+    tr.doc,
+    current.query,
+    current.caseSensitive,
+    current.wholeWord
+  );
+
+  const newIndex = newMatches.length > 0 ? 0 : -1;
+
+  tr.setMeta(searchPluginKey, {
+    matches: newMatches,
+    activeIndex: newIndex,
+  });
+
+  if (newIndex >= 0 && newMatches[0]) {
+    try {
+      tr.setSelection(TextSelection.create(tr.doc, newMatches[0].from, newMatches[0].to));
+      tr.scrollIntoView();
+    } catch {
+      // Fallback if selection couldn't be created
+    }
+  }
+
+  view.dispatch(tr);
+  return count;
 }

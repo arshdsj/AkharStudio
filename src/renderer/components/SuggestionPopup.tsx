@@ -4,7 +4,7 @@
  * Adheres strictly to the Script Editor Design System (tokens.css, components.css, reference.html)
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { SuggestionItem } from '../../core/editor/autocomplete';
 
@@ -15,7 +15,9 @@ interface SuggestionPopupProps {
   selectedIndex: number;
   onSelect: (item: SuggestionItem) => void;
   onClose: () => void;
-  coords: { top: number; left: number } | null;
+  coords: { top: number; left: number; bottom?: number; right?: number } | null;
+  isVirtualKeyboardOpen?: boolean;
+  keyboardHeight?: number;
 }
 
 export const SuggestionPopup: React.FC<SuggestionPopupProps> = ({
@@ -26,15 +28,18 @@ export const SuggestionPopup: React.FC<SuggestionPopupProps> = ({
   onSelect,
   onClose,
   coords,
+  isVirtualKeyboardOpen = false,
+  keyboardHeight,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const [, setTick] = useState(0);
 
   // Auto-scroll selected item into view
   useEffect(() => {
     if (listRef.current) {
       const activeEl = listRef.current.children[selectedIndex] as HTMLElement;
-      if (activeEl) {
+      if (activeEl && typeof activeEl.scrollIntoView === 'function') {
         activeEl.scrollIntoView({ block: 'nearest' });
       }
     }
@@ -54,6 +59,18 @@ export const SuggestionPopup: React.FC<SuggestionPopupProps> = ({
     };
   }, [isOpen, onClose]);
 
+  // Keep position refreshed on window resize or scroll
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleUpdate = () => setTick((t) => t + 1);
+    window.addEventListener('resize', handleUpdate);
+    window.addEventListener('scroll', handleUpdate, true);
+    return () => {
+      window.removeEventListener('resize', handleUpdate);
+      window.removeEventListener('scroll', handleUpdate, true);
+    };
+  }, [isOpen]);
+
   if (!isOpen || items.length === 0 || !coords) return null;
 
   const getTypeLabel = () => {
@@ -67,14 +84,35 @@ export const SuggestionPopup: React.FC<SuggestionPopupProps> = ({
     }
   };
 
+  const cursorTop = coords.top;
+  const cursorBottom = coords.bottom ?? (coords.top + 24);
+  const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
+  const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1200;
+  const effectiveKeyboardHeight = isVirtualKeyboardOpen ? (keyboardHeight || 296) : 0;
+  const visibleBottom = viewportHeight - effectiveKeyboardHeight;
+  const popupWidth = 256; // w-64 = 256px
+  const popupHeight = containerRef.current
+    ? containerRef.current.offsetHeight
+    : Math.min(224, 40 + items.length * 36);
+
+  const spaceBelow = visibleBottom - cursorBottom - 8;
+  const spaceAbove = cursorTop - 8;
+  const positionAbove = spaceBelow < popupHeight && spaceAbove > spaceBelow;
+
+  const top = positionAbove
+    ? Math.max(8, cursorTop - popupHeight - 8)
+    : Math.max(8, Math.min(visibleBottom - popupHeight - 8, cursorBottom + 8));
+
+  const left = Math.max(16, Math.min(viewportWidth - popupWidth - 16, coords.left));
+
   const content = (
     <div
       ref={containerRef}
       onMouseDown={(e) => e.preventDefault()}
       style={{
         position: 'fixed',
-        top: coords.top + 8,
-        left: Math.max(16, Math.min(window.innerWidth - 270, coords.left)),
+        top,
+        left,
         zIndex: 90, // Kept below .ds-scrim (z-index: 100) and dialogs so it never overlaps modals
         background: 'var(--surface-overlay)',
         boxShadow: 'var(--shadow-overlay), inset 0 1px 0 var(--line-edge)',

@@ -208,7 +208,7 @@ describe('Release v1.6: Bug Fixes & UX Improvements', () => {
       expect(logoEl).toHaveClass('shrink-0');
 
       // Check prefix element
-      const prefixEl = logoEl.querySelector('.w-\\[44px\\]');
+      const prefixEl = logoEl.querySelector('.akhar-logo-prefix');
       expect(prefixEl).toBeInTheDocument();
       expect(prefixEl).toHaveTextContent('Akhar');
 
@@ -218,7 +218,7 @@ describe('Release v1.6: Bug Fixes & UX Improvements', () => {
       expect(gurmukhiLogoEl).toHaveClass('w-[160px]');
       expect(gurmukhiLogoEl).toHaveClass('shrink-0');
 
-      const gurmukhiPrefixEl = gurmukhiLogoEl.querySelector('.w-\\[44px\\]');
+      const gurmukhiPrefixEl = gurmukhiLogoEl.querySelector('.akhar-logo-prefix');
       expect(gurmukhiPrefixEl).toBeInTheDocument();
       expect(gurmukhiPrefixEl).toHaveTextContent('ਅੱਖਰ');
     });
@@ -260,11 +260,11 @@ describe('Release v1.6: Bug Fixes & UX Improvements', () => {
       // Verify "Local Database" text is NOT present in the interface
       expect(screen.queryByText('Local Database')).toBeNull();
 
-      // Verify diagnostic buttons are still present and positioned
-      expect(screen.getByLabelText('Start Recording Diagnostics')).toBeInTheDocument();
-      expect(screen.getByLabelText('Stop Recording Diagnostics')).toBeInTheDocument();
-      expect(screen.getByLabelText('Open Diagnostic Console')).toBeInTheDocument();
-      expect(screen.getByLabelText('Diagnostic Options')).toBeInTheDocument();
+      // Verify mini diagnostic tool was removed from header
+      expect(screen.queryByLabelText('Start Recording Diagnostics')).toBeNull();
+      expect(screen.queryByLabelText('Stop Recording Diagnostics')).toBeNull();
+      expect(screen.queryByLabelText('Open Diagnostic Console')).toBeNull();
+      expect(screen.queryByLabelText('Diagnostic Options')).toBeNull();
     });
   });
 });

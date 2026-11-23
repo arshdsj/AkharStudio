@@ -7,7 +7,8 @@ import { HeaderRow1 } from './components/HeaderRow1';
 import { HeaderRow2 } from './components/HeaderRow2';
 import { ScreenplayCanvas } from './components/ScreenplayCanvas';
 import { LeftSidebar } from './components/LeftSidebar';
-import { FloatingToolbar } from './components/FloatingToolbar';
+import { LeftFormattingToolbar } from './components/LeftFormattingToolbar';
+import { UndoRedoPill } from './components/UndoRedoPill';
 import { RightFormattingToolbar } from './components/RightFormattingToolbar';
 import { StatusChip } from './components/StatusChip';
 import { WelcomeScreen } from './components/WelcomeScreen';
@@ -126,6 +127,7 @@ export const App: React.FC = () => {
   const [customDictionaryOpen, setCustomDictionaryOpen] = useState<boolean>(false);
   const [diagnosticModalOpen, setDiagnosticModalOpen] = useState<boolean>(false);
   const [virtualKeyboardOpen, setVirtualKeyboardOpen] = useState<boolean>(false);
+  const [measuredKeyboardHeight, setMeasuredKeyboardHeight] = useState<number>(280);
   const [isShiftHeld, setIsShiftHeld] = useState<boolean>(false);
   const [isAltOrCtrlHeld, setIsAltOrCtrlHeld] = useState<boolean>(false);
   const [inputMode, setInputMode] = useState<'pa' | 'en'>('pa');
@@ -136,9 +138,10 @@ export const App: React.FC = () => {
     characterName: '',
   });
 
-  // In-Draft Search state (ORG-04 P0)
+  // In-Draft Search & Replace state (ORG-04 P0)
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [replaceText, setReplaceText] = useState<string>('');
   const [searchCaseSensitive, setSearchCaseSensitive] = useState<boolean>(false);
   const [searchWholeWord, setSearchWholeWord] = useState<boolean>(false);
   const [searchState, setSearchState] = useState<SearchState>({
@@ -261,6 +264,7 @@ export const App: React.FC = () => {
 
   // Active element focus tracking for toolbar (TOOL-01, TITLE-02)
   const [activeBlock, setActiveBlock] = useState<ScreenplayBlock | null>(null);
+  const [isMixedSelection, setIsMixedSelection] = useState<boolean>(false);
   const [isTitleEditing, setIsTitleEditing] = useState<boolean>(false);
 
   // History stack for Undo/Redo (TOOL-02)
@@ -728,6 +732,25 @@ export const App: React.FC = () => {
     handleRestoreDatabaseBackup,
   ]);
 
+  // Listen to OS file association open event (e.g. double clicking .fountain or .scriptproject in file manager)
+  useEffect(() => {
+    if (window.electronAPI?.onFileOpened) {
+      const unsubscribe = window.electronAPI.onFileOpened((data) => {
+        setHistory([]);
+        setFuture([]);
+        setProject(data.project);
+        setCurrentFilePath(data.filePath || null);
+        setProjectSource(data.filePath ? 'external' : 'database');
+        setSaveStatus('clean');
+        setIsWelcomeOpen(false);
+        setLibraryModalOpen(false);
+        showToast(`Opened: ${data.project.title}`);
+        window.electronAPI?.getRecentProjects().then(setRecentProjects);
+      });
+      return unsubscribe;
+    }
+  }, [showToast]);
+
   // In-Draft Search handlers (ORG-04 P0)
   const handleOpenSearch = useCallback(() => {
     setIsSearchOpen(true);
@@ -770,6 +793,14 @@ export const App: React.FC = () => {
   const handleFindPrev = useCallback(() => {
     editorRef.current?.findPrev();
   }, []);
+
+  const handleReplace = useCallback(() => {
+    editorRef.current?.replaceCurrent(replaceText);
+  }, [replaceText]);
+
+  const handleReplaceAll = useCallback(() => {
+    editorRef.current?.replaceAll(replaceText);
+  }, [replaceText]);
 
   // Global Keyboard shortcuts (Mod+S, Mod+O, Mod+N, Mod+F)
   useEffect(() => {
@@ -1235,6 +1266,121 @@ export const App: React.FC = () => {
     }
   };
 
+  // Context Menu: Direct Export from Projects Window without opening
+  const handleExportProjectDirectly = useCallback(
+    async (rec: RecentProject, format: 'pdf' | 'fountain' | 'bundle') => {
+      if (!window.electronAPI) return;
+      try {
+        let targetProj: ScriptProject | null = null;
+        if (rec.source === 'database' || !rec.filePath) {
+          targetProj = await window.electronAPI.dbGetProject(rec.id);
+        } else {
+          targetProj = await window.electronAPI.getProjectData(rec.id, rec.filePath);
+        }
+
+        if (!targetProj) {
+          alert('Unable to load project for export.');
+          return;
+        }
+
+        const title = targetProj.title || 'Screenplay';
+        const activeDr = getActiveDraft(targetProj);
+
+        if (format === 'pdf') {
+          const res = await window.electronAPI.exportPdf({
+            project: targetProj,
+            paperSize: targetProj.settings?.paperSize || 'a4',
+            includeTitlePage: true,
+            exportArea: 'entire_script',
+          });
+          if (res?.success) {
+            showToast(`Exported "${title}" to PDF`);
+          }
+        } else if (format === 'fountain') {
+          const fountainText = exportToFountain(activeDr, targetProj.metadata);
+          const res = await window.electronAPI.exportFountainFile(title, fountainText);
+          if (res?.success) {
+            showToast(`Exported "${title}" to Fountain`);
+          }
+        } else if (format === 'bundle') {
+          const res = await window.electronAPI.exportProjectBundleDialog(title, targetProj);
+          if (res?.success) {
+            showToast(`Exported "${title}" project bundle`);
+          }
+        }
+      } catch (err) {
+        console.error('Direct export failed:', err);
+        alert(`Export failed: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    },
+    [showToast]
+  );
+
+  // Context Menu: Direct Save As from Projects Window
+  const handleSaveAsProjectDirectly = useCallback(
+    async (rec: RecentProject) => {
+      if (!window.electronAPI) return;
+      try {
+        let targetProj: ScriptProject | null = null;
+        if (rec.source === 'database' || !rec.filePath) {
+          targetProj = await window.electronAPI.dbGetProject(rec.id);
+        } else {
+          targetProj = await window.electronAPI.getProjectData(rec.id, rec.filePath);
+        }
+
+        if (!targetProj) {
+          alert('Unable to load project.');
+          return;
+        }
+
+        const title = targetProj.title || 'Screenplay';
+        const savedPath = await window.electronAPI.saveProjectDialog(title, targetProj);
+        if (savedPath) {
+          const recents = await window.electronAPI.getRecentProjects();
+          setRecentProjects(recents);
+          showToast(`Saved copy to ${savedPath.split('/').pop() || savedPath.split('\\').pop()}`);
+        }
+      } catch (err) {
+        console.error('Direct Save As failed:', err);
+        alert(`Save As failed: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    },
+    [showToast]
+  );
+
+  // Context Menu: Direct Delete from Projects Window
+  const handleDeleteProjectDirectly = useCallback(
+    async (rec: RecentProject) => {
+      if (!window.electronAPI) return;
+      const title = rec.title || 'Untitled Screenplay';
+      const confirmed = window.confirm(`Are you sure you want to delete "${title}"? This cannot be undone.`);
+      if (!confirmed) return;
+
+      try {
+        await window.electronAPI.deleteProject(rec.id, rec.filePath);
+
+        // If the deleted project was the currently opened project in editor, reset editor to a fresh project
+        if (project.id === rec.id || (rec.filePath && currentFilePath === rec.filePath)) {
+          const fresh = createDefaultProject();
+          setHistory([]);
+          setFuture([]);
+          setProject(fresh);
+          setCurrentFilePath(null);
+          setProjectSource('database');
+          setSaveStatus('clean');
+        }
+
+        const recents = await window.electronAPI.getRecentProjects();
+        setRecentProjects(recents);
+        showToast(`Deleted "${title}"`);
+      } catch (err) {
+        console.error('Delete project failed:', err);
+        alert(`Delete failed: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    },
+    [project.id, currentFilePath, showToast]
+  );
+
   return (
     <div
       className="ds-app flex flex-col h-screen w-screen overflow-hidden select-none"
@@ -1280,7 +1426,12 @@ export const App: React.FC = () => {
       />
 
       {/* Main Document Workspace */}
-      <div className="flex-1 flex overflow-hidden relative select-text">
+      <div
+        className="flex-1 flex overflow-hidden relative select-text"
+        style={{
+          '--left-panel-width': sidebarOpen ? 'var(--panel-width)' : '0px',
+        } as React.CSSProperties}
+      >
         {/* Left Sidebar Panel (Navigation, Language & Settings) */}
         <LeftSidebar
           isOpen={sidebarOpen}
@@ -1323,6 +1474,7 @@ export const App: React.FC = () => {
           contdSetting={project.settings.contdSetting}
           inputMode={inputMode}
           isVirtualKeyboardOpen={virtualKeyboardOpen}
+          keyboardHeight={measuredKeyboardHeight}
           onToggleVirtualKeyboard={() => setVirtualKeyboardOpen((prev) => !prev)}
           onShiftChange={setIsShiftHeld}
           onAltOrCtrlChange={setIsAltOrCtrlHeld}
@@ -1332,7 +1484,10 @@ export const App: React.FC = () => {
           paperSize={project.settings.paperSize}
           zoom={zoom}
           onFocusTitle={setIsTitleEditing}
-          onFocusBlock={setActiveBlock}
+          onFocusBlock={(block, isMixed) => {
+            setActiveBlock(block);
+            setIsMixedSelection(Boolean(isMixed));
+          }}
           isTitlePageExpanded={isTitlePageExpanded}
           onToggleTitlePageExpand={() => setIsTitlePageExpanded((prev) => !prev)}
           highlightCharacters={highlightCharactersSetting}
@@ -1369,12 +1524,14 @@ export const App: React.FC = () => {
           }}
         />
 
-        {/* In-Draft Search Bar (ORG-04 P0, A11Y-01) */}
+        {/* In-Draft Find and Replace Bar (ORG-04 P0, A11Y-01) */}
         <FindBar
           isOpen={isSearchOpen}
           onClose={handleCloseSearch}
           query={searchQuery}
           onQueryChange={handleSearchQueryChange}
+          replaceText={replaceText}
+          onReplaceTextChange={setReplaceText}
           matchesCount={searchState.matches.length}
           activeIndex={searchState.activeIndex}
           caseSensitive={searchCaseSensitive}
@@ -1383,11 +1540,15 @@ export const App: React.FC = () => {
           onToggleWholeWord={handleToggleWholeWord}
           onFindNext={handleFindNext}
           onFindPrev={handleFindPrev}
+          onReplace={handleReplace}
+          onReplaceAll={handleReplaceAll}
+          inputMode={inputMode}
         />
 
-        {/* Contextual Right-Side Formatting Toolbar */}
+        {/* Contextual Right-Side Formatting Toolbar (Claude Redesign) */}
         <RightFormattingToolbar
           activeBlock={activeBlock}
+          isMixedSelection={isMixedSelection}
           isTitleEditing={isTitleEditing}
           onSelectBlockType={(type) => {
             if (editorRef.current) {
@@ -1399,96 +1560,109 @@ export const App: React.FC = () => {
           }}
           onKeepFocus={() => editorRef.current?.focus()}
         />
+
+        {/* Left Vertical Formatting Toolbar (13 icons in 3 groups) */}
+        <LeftFormattingToolbar
+          activeBlock={activeBlock}
+          isTitleEditing={isTitleEditing}
+          onApplyFormat={(fmt) => {
+            editorRef.current?.toggleFormat(fmt);
+            editorRef.current?.focus();
+          }}
+          onHighlight={() => {
+            editorRef.current?.toggleHighlight();
+            editorRef.current?.focus();
+          }}
+          onFormatPainter={() => {
+            const active = editorRef.current?.triggerFormatPainter();
+            setFormatPainterActive(Boolean(active));
+            editorRef.current?.focus();
+          }}
+          isFormatPainterActive={formatPainterActive}
+          onLink={(url) => {
+            editorRef.current?.setLink(url);
+            editorRef.current?.focus();
+          }}
+          onAddAnnotationLayer={(layer) => {
+            editorRef.current?.setBlockAnnotation(layer);
+            editorRef.current?.focus();
+          }}
+          onComment={(comment) => {
+            editorRef.current?.setBlockComment(comment);
+            editorRef.current?.focus();
+          }}
+          onToggleCase={() => {
+            editorRef.current?.focus();
+          }}
+          onCopy={() => {
+            if (activeBlock) {
+              navigator.clipboard.writeText(activeBlock.text);
+            }
+            editorRef.current?.focus();
+          }}
+          isKeyboardOpen={virtualKeyboardOpen}
+          onToggleKeyboard={() => {
+            setVirtualKeyboardOpen((prev) => !prev);
+            editorRef.current?.focus();
+          }}
+          onKeepFocus={() => editorRef.current?.focus()}
+        />
+
+        {/* Bottom-Left Standalone Undo / Redo Pill */}
+        <UndoRedoPill
+          canUndo={history.length > 0}
+          canRedo={future.length > 0}
+          onUndo={() => {
+            handleUndo();
+            editorRef.current?.focus();
+          }}
+          onRedo={() => {
+            handleRedo();
+            editorRef.current?.focus();
+          }}
+          onKeepFocus={() => editorRef.current?.focus()}
+          isKeyboardOpen={virtualKeyboardOpen}
+          keyboardHeight={measuredKeyboardHeight + 16}
+        />
       </div>
 
-      {/* Floating Bottom-Center Toolbar (TOOL-01, TOOL-02, TITLE-02) */}
-      <FloatingToolbar
-        activeBlock={activeBlock}
-        isTitleEditing={isTitleEditing}
-        canUndo={history.length > 0}
-        canRedo={future.length > 0}
-        onUndo={() => {
-          handleUndo();
-          editorRef.current?.focus();
+      {/* Dedicated Virtual Keyboard Bottom Dock (Flex Layout Child) */}
+      <div
+        className="virtual-keyboard-dock shrink-0 w-full flex justify-center items-center relative overflow-hidden"
+        style={{
+          height: virtualKeyboardOpen ? `${measuredKeyboardHeight + 16}px` : '0px',
+          transition: 'height var(--dur-slow) var(--ease)',
+          background: 'var(--surface-canvas)',
+          borderTop: virtualKeyboardOpen ? '1px solid var(--line-separator)' : 'none',
+          zIndex: 35,
         }}
-        onRedo={() => {
-          handleRedo();
-          editorRef.current?.focus();
-        }}
-        onApplyFormat={(fmt) => {
-          editorRef.current?.toggleFormat(fmt);
-          editorRef.current?.focus();
-        }}
-        onHighlight={() => {
-          editorRef.current?.toggleHighlight();
-          editorRef.current?.focus();
-        }}
-        onFormatPainter={() => {
-          const active = editorRef.current?.triggerFormatPainter();
-          setFormatPainterActive(Boolean(active));
-          editorRef.current?.focus();
-        }}
-        isFormatPainterActive={formatPainterActive}
-        onLink={(url) => {
-          editorRef.current?.setLink(url);
-          editorRef.current?.focus();
-        }}
-        onAddAnnotationLayer={(layer) => {
-          editorRef.current?.setBlockAnnotation(layer);
-          editorRef.current?.focus();
-        }}
-        onComment={(comment) => {
-          editorRef.current?.setBlockComment(comment);
-          editorRef.current?.focus();
-        }}
-        onToggleCase={() => {
-          editorRef.current?.focus();
-        }}
-        onCopy={() => {
-          if (activeBlock) {
-            navigator.clipboard.writeText(activeBlock.text);
-          }
-          editorRef.current?.focus();
-        }}
-        onSelectBlockType={(type) => {
-          if (editorRef.current) {
-            editorRef.current.setBlockType(type);
-          } else if (activeBlock) {
-            handleBlockTypeChange(activeBlock.id, type);
-          }
-          editorRef.current?.focus();
-        }}
-        isKeyboardOpen={virtualKeyboardOpen}
-        onToggleKeyboard={() => {
-          setVirtualKeyboardOpen((prev) => !prev);
-          editorRef.current?.focus();
-        }}
-        onKeepFocus={() => editorRef.current?.focus()}
-      />
-
-      {/* Virtual Gurmukhi Keyboard (Offline On-Screen Keyboard) */}
-      <VirtualGurmukhiKeyboard
-        isOpen={virtualKeyboardOpen}
-        onClose={() => {
-          setVirtualKeyboardOpen(false);
-          editorRef.current?.focus();
-        }}
-        onInsertOutput={(output) => {
-          editorRef.current?.insertKeyOutput(output);
-          editorRef.current?.focus();
-        }}
-        onBackspace={() => {
-          editorRef.current?.backspace();
-          editorRef.current?.focus();
-        }}
-        onKeepFocus={() => {
-          editorRef.current?.focus();
-        }}
-        externalShift={isShiftHeld}
-        onShiftChange={setIsShiftHeld}
-        externalAltOrCtrl={isAltOrCtrlHeld}
-        onAltOrCtrlChange={setIsAltOrCtrlHeld}
-      />
+      >
+        <VirtualGurmukhiKeyboard
+          isOpen={virtualKeyboardOpen}
+          onClose={() => {
+            setVirtualKeyboardOpen(false);
+            editorRef.current?.focus();
+          }}
+          onInsertOutput={(output) => {
+            editorRef.current?.insertKeyOutput(output);
+            editorRef.current?.focus();
+          }}
+          onBackspace={() => {
+            editorRef.current?.backspace();
+            editorRef.current?.focus();
+          }}
+          onKeepFocus={() => {
+            editorRef.current?.focus();
+          }}
+          externalShift={isShiftHeld}
+          onShiftChange={setIsShiftHeld}
+          externalAltOrCtrl={isAltOrCtrlHeld}
+          onAltOrCtrlChange={setIsAltOrCtrlHeld}
+          onMeasuredHeight={(h) => {
+            if (h > 0) setMeasuredKeyboardHeight(h);
+          }}
+        />
+      </div>
 
       {/* Bottom-Right Status Chip (STAT-01, PAGE-03, Requirement 4) */}
       <StatusChip
@@ -1496,6 +1670,8 @@ export const App: React.FC = () => {
         currentPage={currentPage}
         showWordCount={showWordCount}
         onOpenHelp={() => setHelpModalOpen(true)}
+        isKeyboardOpen={virtualKeyboardOpen}
+        keyboardHeight={measuredKeyboardHeight + 16}
       />
 
       {/* Modals & Dialogs */}
@@ -1519,6 +1695,9 @@ export const App: React.FC = () => {
         onImportBundle={handleImportBundle}
         onExportBackup={handleExportDatabaseBackup}
         onRestoreBackup={handleRestoreDatabaseBackup}
+        onExportProjectDirectly={handleExportProjectDirectly}
+        onSaveAsProjectDirectly={handleSaveAsProjectDirectly}
+        onDeleteProjectDirectly={handleDeleteProjectDirectly}
       />
 
       <RecoveryModal
@@ -1635,6 +1814,9 @@ export const App: React.FC = () => {
         onOpenRecent={handleOpenRecent}
         onRestoreBackup={handleRestoreDatabaseBackup}
         onExportBackup={handleExportDatabaseBackup}
+        onExportProjectDirectly={handleExportProjectDirectly}
+        onSaveAsProjectDirectly={handleSaveAsProjectDirectly}
+        onDeleteProjectDirectly={handleDeleteProjectDirectly}
         canDismiss={true}
         onDismiss={() => setIsWelcomeOpen(false)}
       />

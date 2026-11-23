@@ -22,6 +22,7 @@ interface VirtualGurmukhiKeyboardProps {
   onShiftChange?: (isShift: boolean) => void;
   externalAltOrCtrl?: boolean;
   onAltOrCtrlChange?: (isAltOrCtrl: boolean) => void;
+  onMeasuredHeight?: (height: number) => void;
 }
 
 export const VirtualGurmukhiKeyboard: React.FC<VirtualGurmukhiKeyboardProps> = ({
@@ -35,12 +36,42 @@ export const VirtualGurmukhiKeyboard: React.FC<VirtualGurmukhiKeyboardProps> = (
   onShiftChange,
   externalAltOrCtrl,
   onAltOrCtrlChange,
+  onMeasuredHeight,
 }) => {
+  const containerRef = React.useRef<HTMLDivElement>(null);
   const [internalShift, setInternalShift] = useState<boolean>(false);
   const isShift = externalShift !== undefined ? externalShift : internalShift;
 
   const [internalAltOrCtrl, setInternalAltOrCtrl] = useState<boolean>(false);
   const isAltOrCtrl = externalAltOrCtrl !== undefined ? externalAltOrCtrl : internalAltOrCtrl;
+
+  // Measure keyboard height accurately using ResizeObserver
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const updateHeight = () => {
+      if (containerRef.current) {
+        const height = containerRef.current.offsetHeight;
+        if (height > 0 && onMeasuredHeight) {
+          onMeasuredHeight(height);
+        }
+      }
+    };
+
+    updateHeight();
+
+    if (typeof ResizeObserver !== 'undefined') {
+      const ro = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          const h = entry.borderBoxSize?.[0]?.blockSize ?? entry.contentRect.height;
+          if (h > 0 && onMeasuredHeight) {
+            onMeasuredHeight(Math.round(h));
+          }
+        }
+      });
+      ro.observe(containerRef.current);
+      return () => ro.disconnect();
+    }
+  }, [onMeasuredHeight]);
 
   const updateShift = useCallback(
     (newShift: boolean) => {
@@ -92,8 +123,6 @@ export const VirtualGurmukhiKeyboard: React.FC<VirtualGurmukhiKeyboardProps> = (
       window.removeEventListener('keyup', handleKeyUp);
     };
   }, [isOpen, updateShift, updateAltOrCtrl, onClose]);
-
-  if (!isOpen) return null;
 
   const handlePreventFocusLoss = (e: React.SyntheticEvent) => {
     e.preventDefault();
@@ -235,15 +264,21 @@ export const VirtualGurmukhiKeyboard: React.FC<VirtualGurmukhiKeyboardProps> = (
 
   return (
     <div
+      ref={containerRef}
       role="region"
       aria-label="Virtual Gurmukhi Keyboard"
+      aria-hidden={!isOpen}
       onMouseDown={handlePreventFocusLoss}
       onPointerDown={handlePreventFocusLoss}
-      className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 p-3 w-[780px] select-none animate-in fade-in zoom-in-95 duration-100"
+      className="p-3 w-[780px] max-w-[calc(100vw-32px)] select-none my-2 shrink-0"
       style={{
         background: 'var(--surface-overlay)',
         borderRadius: 'var(--radius-lg)',
         boxShadow: 'var(--shadow-overlay), inset 0 1px 0 var(--line-edge)',
+        transform: isOpen ? 'translateY(0)' : 'translateY(100%)',
+        opacity: isOpen ? 1 : 0,
+        pointerEvents: isOpen ? 'auto' : 'none',
+        transition: 'transform var(--dur-slow) var(--ease), opacity var(--dur-slow) var(--ease)',
       }}
     >
       {/* Keyboard Header */}

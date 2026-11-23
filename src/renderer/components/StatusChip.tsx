@@ -13,6 +13,8 @@ interface StatusChipProps {
   currentPage?: number;
   showWordCount?: boolean;
   onOpenHelp: () => void;
+  isKeyboardOpen?: boolean;
+  keyboardHeight?: number;
 }
 
 export const StatusChip: React.FC<StatusChipProps> = ({
@@ -20,11 +22,15 @@ export const StatusChip: React.FC<StatusChipProps> = ({
   currentPage = 1,
   showWordCount = true,
   onOpenHelp,
+  isKeyboardOpen = false,
+  keyboardHeight,
 }) => {
   return (
     <div
-      className="fixed bottom-6 right-6 z-40 flex items-center gap-2.5 select-none"
+      className="fixed right-6 z-40 flex items-center gap-2.5 select-none"
       style={{
+        bottom: isKeyboardOpen ? `${(keyboardHeight || 296) + 12}px` : '1.5rem',
+        transition: 'bottom var(--dur-slow) var(--ease)',
         height: 'var(--h-lg)',
         padding: '0 var(--space-3)',
         borderRadius: '9999px',

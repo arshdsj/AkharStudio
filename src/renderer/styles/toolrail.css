@@ -1,0 +1,271 @@
+/* ==========================================================================
+   toolrail.css — Claude's Element Rail Redesign & Shared Palette System
+   Additive styling for Akhar Studio.
+   Adds:
+     .ds-palette   floating tool surface (side rail and bottom toolbar)
+     .ds-tool      32px icon button used inside palettes
+     .ds-rail      vertical screenplay element rail (+ .ds-rail--chip)
+     .ds-tip       compact one-line tooltip with progressive detail
+     .ds-kbd       subtle keyboard shortcut badge
+   ========================================================================== */
+
+/* ---- Palette: a persistent floating tool surface -------------------------
+   Radius is concentric: 4 (button radius) + 4 (padding) = 8 (--radius-lg).  */
+.ds-palette {
+  background: var(--surface-panel);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-palette), inset 0 1px 0 var(--line-edge);
+  padding: var(--rail-pad);
+}
+
+/* ---- Tool button (rail, bottom toolbar, any palette) ---------------------- */
+.ds-tool {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: var(--h-lg);
+  height: var(--h-lg);
+  padding: 0;
+  border: 0;
+  background-color: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color 140ms var(--ease), color 140ms var(--ease);
+}
+.ds-tool svg {
+  width: 16px;
+  height: 16px;
+  transition: stroke 140ms var(--ease);
+}
+.ds-tool:hover {
+  background-color: var(--surface-hover);
+  color: var(--text-primary);
+}
+.ds-tool:active {
+  background-color: var(--surface-pressed);
+  color: var(--text-primary);
+}
+.ds-tool:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+/* Active = selection tint + accent icon.
+   Solid accent fill is reserved for primary actions such as Export. */
+.ds-tool[aria-checked="true"],
+.ds-tool[aria-pressed="true"],
+.ds-tool.is-active {
+  background-color: var(--surface-selected);
+  color: var(--text-accent);
+  transition: background-color 140ms var(--ease), color 140ms var(--ease);
+}
+.ds-tool[aria-checked="true"]:hover,
+.ds-tool[aria-pressed="true"]:hover,
+.ds-tool.is-active:hover {
+  background-color: var(--surface-selected);
+  color: var(--text-accent);
+}
+.ds-tool:disabled {
+  background-color: transparent;
+  color: var(--text-disabled);
+  cursor: default;
+  opacity: 0.4;
+}
+
+/* ---- Vertical element rail ------------------------------------------------
+   Width = 4 + 32 + 4 = 40. Groups are separated by spacing (12px), not lines. */
+.ds-rail-dock {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: var(--rail-inset);
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  pointer-events: none; /* Vertical centring without layout shifts or transforms */
+}
+.ds-rail-dock > * {
+  pointer-events: auto;
+}
+
+.ds-rail {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--rail-group-gap);
+  transform-origin: 100% 50%;
+  box-sizing: border-box;
+  margin: 0;
+}
+
+.ds-rail__radios {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rail-group-gap);
+}
+
+.ds-rail__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rail-gap);
+}
+
+.ds-rail[data-state="open"] {
+  animation: ds-pop-in var(--dur-base) var(--ease) both;
+}
+.ds-rail[data-state="closing"] {
+  animation: ds-pop-out var(--dur-exit) var(--ease-in) both;
+  pointer-events: none;
+}
+
+/* Collapsed: one small chip that still displays the currently active element */
+.ds-rail--chip {
+  position: relative;
+  padding: var(--rail-pad);
+  transform-origin: 100% 50%;
+  box-sizing: border-box;
+  margin: 0;
+}
+.ds-rail--chip .ds-tool {
+  color: var(--text-accent);
+}
+.ds-rail--chip[data-state="open"] {
+  animation: ds-pop-in var(--dur-base) var(--ease) both;
+}
+.ds-rail--chip[data-state="closing"] {
+  animation: ds-pop-out var(--dur-exit) var(--ease-in) both;
+  pointer-events: none;
+}
+
+/* ---- Tooltip: one line by default, description unfolds smoothly on 900ms hold ---- */
+.ds-tip {
+  position: fixed;
+  z-index: 100;
+  pointer-events: none;
+  width: max-content;
+  max-width: 256px;
+  padding: 0 var(--space-3);
+  background: var(--surface-overlay);
+  color: var(--text-primary);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-palette), inset 0 1px 0 var(--line-edge);
+  overflow: hidden;
+  box-sizing: border-box;
+  animation: ds-fade-in var(--dur-fast) var(--ease) both;
+  user-select: none;
+}
+
+.ds-tip__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  height: var(--h-lg); /* 32px — matches the tool button height */
+  white-space: nowrap;
+}
+
+.ds-tip__name {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  color: var(--text-primary);
+}
+
+.ds-kbd {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  letter-spacing: 0.02em;
+  font-family: inherit;
+}
+
+/* Progressive disclosure expander using CSS grid row interpolation */
+.ds-tip__expander {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 180ms var(--ease);
+}
+
+.ds-tip.is-detail .ds-tip__expander {
+  grid-template-rows: 1fr;
+}
+
+.ds-tip__expander-inner {
+  overflow: hidden;
+}
+
+.ds-tip__desc {
+  margin: 0;
+  padding-top: 2px;
+  padding-bottom: var(--space-2);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  line-height: var(--leading-body);
+  white-space: normal;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 140ms var(--ease), transform 140ms var(--ease);
+}
+
+.ds-tip.is-detail .ds-tip__desc {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ds-tool,
+  .ds-tool svg,
+  .ds-tip__expander,
+  .ds-tip__desc,
+  .left-formatting-toolbar,
+  .undo-redo-pill {
+    transition: none !important;
+    transform: none !important;
+  }
+}
+
+/* ---- Left vertical formatting toolbar ------------------------------------ */
+.left-formatting-toolbar {
+  position: absolute;
+  left: calc(var(--left-panel-width, 0px) + 13px);
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  border-radius: 9px;
+  background: #232323;
+  border: 1px solid #2e2e2e;
+  box-shadow: var(--shadow-palette), inset 0 1px 0 var(--line-edge);
+  padding: 20px 4px;
+  box-sizing: border-box;
+  max-height: calc(100% - 32px);
+  overflow-y: auto;
+  overflow-x: visible;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  z-index: 30;
+  pointer-events: auto;
+  transition: left 240ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.left-formatting-toolbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* ---- Standalone bottom-left undo/redo pill ------------------------------ */
+.undo-redo-pill {
+  position: absolute;
+  left: calc(var(--left-panel-width, 0px) + 21px);
+  bottom: 22px;
+  width: 92px;
+  height: 32px;
+  border-radius: 9999px;
+  background: #2a2a2a;
+  box-shadow: var(--shadow-overlay), inset 0 1px 0 var(--line-edge);
+  border: none;
+  padding: 0 6px;
+  box-sizing: border-box;
+  z-index: 30;
+  pointer-events: auto;
+  transition: left 240ms cubic-bezier(0.16, 1, 0.3, 1), bottom var(--dur-slow) var(--ease);
+}

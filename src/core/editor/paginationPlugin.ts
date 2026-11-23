@@ -40,7 +40,7 @@ export function calculateBlockEstimatedLines(type: ScreenplayBlockType, text: st
 /**
  * Creates the DOM element for the screenplay page break widget.
  */
-export function createPageBreakDOM(pageNumber: number, paperSize: PaperSize = 'letter'): HTMLElement {
+export function createPageBreakDOM(pageNumber: number, paperSize: PaperSize = 'a4'): HTMLElement {
   const container = document.createElement('div');
   container.className = `screenplay-page-break select-none ${paperSize === 'a4' ? 'paper-a4' : 'paper-letter'}`;
   container.setAttribute('contenteditable', 'false');
@@ -97,7 +97,7 @@ export function createPageBreakDOM(pageNumber: number, paperSize: PaperSize = 'l
  * Creates the ProseMirror Pagination Plugin.
  */
 export function createPaginationPlugin(options: PaginationPluginOptions = {}): Plugin {
-  let currentPaperSize: PaperSize = options.paperSize || 'letter';
+  let currentPaperSize: PaperSize = options.paperSize || 'a4';
 
   return new Plugin({
     key: paginationPluginKey,

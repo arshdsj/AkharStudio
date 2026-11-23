@@ -391,23 +391,23 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                   type="button"
                   className="ds-seg__item"
                   role="radio"
-                  aria-checked={paperSize === 'letter'}
-                  onClick={() => onPaperSizeChange('letter')}
-                >
-                  US Letter
-                </button>
-                <button
-                  type="button"
-                  className="ds-seg__item"
-                  role="radio"
                   aria-checked={paperSize === 'a4'}
                   onClick={() => onPaperSizeChange('a4')}
                 >
                   A4
                 </button>
+                <button
+                  type="button"
+                  className="ds-seg__item"
+                  role="radio"
+                  aria-checked={paperSize === 'letter'}
+                  onClick={() => onPaperSizeChange('letter')}
+                >
+                  US Letter
+                </button>
               </div>
               <p className="ds-help">
-                US Letter (8.5 &times; 11 in) is standard for North American screenplays; A4 (210 &times; 297 mm) is standard internationally.
+                A4 (210 &times; 297 mm) is default; US Letter (8.5 &times; 11 in) is available as an alternative.
               </p>
             </div>
           </section>

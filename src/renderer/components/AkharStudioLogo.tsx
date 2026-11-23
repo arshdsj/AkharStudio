@@ -63,14 +63,6 @@ export const AkharStudioLogo: React.FC<AkharStudioLogoProps> = ({
     ? 'w-[130px]'
     : 'w-[160px]';
 
-  const prefixWidthClass = isHero
-    ? 'w-[100px]'
-    : isLg
-    ? 'w-[75px]'
-    : isSm
-    ? 'w-[34px]'
-    : 'w-[44px]';
-
   return (
     <div
       onClick={mode ? undefined : triggerTransition}
@@ -108,7 +100,7 @@ export const AkharStudioLogo: React.FC<AkharStudioLogoProps> = ({
             : 'text-sm font-semibold'
         } tracking-tight transition-transform duration-300 shrink-0`}
       >
-        <div className={`relative inline-flex items-center justify-start ${prefixWidthClass} shrink-0 overflow-hidden`}>
+        <div className="akhar-logo-prefix relative inline-flex items-center justify-start shrink-0">
           <span
             className={`transition-all duration-300 transform leading-none ${
               isAnimating
@@ -140,9 +132,9 @@ export const AkharStudioLogo: React.FC<AkharStudioLogoProps> = ({
           </span>
         </div>
         <span
-          className={`text-zinc-400 font-medium ml-1 tracking-normal leading-none shrink-0 ${
-            isHero ? 'text-3xl' : isLg ? 'text-2xl' : ''
-          }`}
+          className={`text-zinc-400 font-medium ${
+            isHero ? 'ml-2 text-3xl' : isLg ? 'ml-1.5 text-2xl' : 'ml-1'
+          } tracking-normal leading-none shrink-0`}
         >
           Studio
         </span>

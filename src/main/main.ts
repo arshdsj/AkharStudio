@@ -25,10 +25,53 @@ let closeRequested = false;
 let closeRequestTimer: NodeJS.Timeout | null = null;
 let sessionInterruptedOnLaunch = false;
 let startupRecoveryCheckpoint: SessionRecoveryCheckpoint | null = null;
+let fileToOpenOnStartup: string | null = null;
 
 const userDataPath = app.getPath('userData');
 const fsManager = new FileSystemManager(userDataPath);
 const dbManager = new DatabaseManager(path.join(userDataPath, 'database'));
+
+async function openFileAndSendToRenderer(filePath: string) {
+  try {
+    const project = await fsManager.openProject(filePath);
+    dbManager.saveProject(project);
+    dbManager.recordExternalFile(filePath, project.title, project.id);
+    if (mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents) {
+      mainWindow.webContents.send('app:file-opened', { filePath, project });
+    }
+  } catch (err) {
+    console.error('Failed to open file requested by OS:', err);
+  }
+}
+
+// macOS open-file event: handles double-clicking associated .fountain or .scriptproject files
+app.on('open-file', (event, filePath) => {
+  event.preventDefault();
+  if (mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents && !mainWindow.webContents.isLoading()) {
+    openFileAndSendToRenderer(filePath);
+  } else {
+    fileToOpenOnStartup = filePath;
+  }
+});
+
+// Windows/Linux Single Instance Lock & file opening
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+  app.quit();
+} else {
+  app.on('second-instance', (_event, argv) => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+      const fileArg = argv.slice(1).find(
+        (arg) => !arg.startsWith('--') && (arg.endsWith('.scriptproject') || arg.endsWith('.fountain'))
+      );
+      if (fileArg) {
+        openFileAndSendToRenderer(fileArg);
+      }
+    }
+  });
+}
 
 function createWindow() {
   const iconPath = path.join(__dirname, '../assets/icon.png');
@@ -57,6 +100,23 @@ function createWindow() {
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
+
+  // Handle opening file on startup (macOS open-file or Windows/Linux process.argv)
+  mainWindow.webContents.on('did-finish-load', () => {
+    if (fileToOpenOnStartup) {
+      openFileAndSendToRenderer(fileToOpenOnStartup);
+      fileToOpenOnStartup = null;
+    } else {
+      const fileArg = process.argv
+        .slice(1)
+        .find(
+          (arg) => !arg.startsWith('--') && (arg.endsWith('.scriptproject') || arg.endsWith('.fountain'))
+        );
+      if (fileArg && fs.existsSync(fileArg)) {
+        openFileAndSendToRenderer(fileArg);
+      }
+    }
+  });
 
   mainWindow.on('close', (e) => {
     if (!isQuitting) {
@@ -237,8 +297,13 @@ ipcMain.handle('storage:open-file-dialog', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     title: 'Open Punjabi Script',
     filters: [
-      { name: 'Punjabi Script Projects', extensions: ['scriptproject', 'json'] },
-      { name: 'All Files', extensions: ['*'] },
+      {
+        name: 'Supported Screenplay Files (*.scriptproject, *.fountain, *.json)',
+        extensions: ['scriptproject', 'fountain', 'json'],
+      },
+      { name: 'Punjabi Script Projects (*.scriptproject)', extensions: ['scriptproject'] },
+      { name: 'Fountain Screenplays (*.fountain)', extensions: ['fountain'] },
+      { name: 'All Files (*.*)', extensions: ['*'] },
     ],
     properties: ['openFile'],
   });
@@ -253,6 +318,28 @@ ipcMain.handle('storage:open-file-dialog', async () => {
   dbManager.saveProject(project);
   dbManager.recordExternalFile(filePath, project.title, project.id);
   return { filePath, project };
+});
+
+ipcMain.handle('storage:remove-recent-file', async (_event, filePath: string) => {
+  dbManager.removeRecentExternalFile(filePath);
+  return true;
+});
+
+ipcMain.handle('storage:get-project-data', async (_event, id: string, filePath?: string) => {
+  if (filePath && fs.existsSync(filePath)) {
+    return fsManager.openProject(filePath);
+  }
+  return dbManager.getProject(id);
+});
+
+ipcMain.handle('storage:delete-project', async (_event, id: string, filePath?: string) => {
+  if (id) {
+    dbManager.deleteProject(id);
+  }
+  if (filePath) {
+    dbManager.removeRecentExternalFile(filePath);
+  }
+  return true;
 });
 
 ipcMain.handle('storage:open-recent-file', async (_event, filePath: string) => {

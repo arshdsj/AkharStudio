@@ -272,19 +272,19 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                   type="button"
                   className="ds-seg__item"
                   role="radio"
-                  aria-checked={paperSize === 'letter'}
-                  onClick={() => setPaperSize('letter')}
+                  aria-checked={paperSize === 'a4'}
+                  onClick={() => setPaperSize('a4')}
                 >
-                  US Letter · 8.5 × 11 in
+                  A4 · 210 × 297 mm
                 </button>
                 <button
                   type="button"
                   className="ds-seg__item"
                   role="radio"
-                  aria-checked={paperSize === 'a4'}
-                  onClick={() => setPaperSize('a4')}
+                  aria-checked={paperSize === 'letter'}
+                  onClick={() => setPaperSize('letter')}
                 >
-                  A4 · 210 × 297 mm
+                  US Letter · 8.5 × 11 in
                 </button>
               </div>
             </div>

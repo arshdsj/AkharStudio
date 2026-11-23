@@ -239,6 +239,7 @@ export interface BlockStyleSpecification {
   maxWidthPx?: number;
   fontWeight?: string;
   textTransform?: string;
+  textAlign?: string;
 }
 
 export const SCREENPLAY_BLOCK_STYLES: Record<ScreenplayBlockType, BlockStyleSpecification> = {
@@ -265,7 +266,8 @@ export const SCREENPLAY_BLOCK_STYLES: Record<ScreenplayBlockType, BlockStyleSpec
     linePitchPx: LINE_PITCH_PX,
     marginTopPx: LINE_PITCH_PX, // 20px
     marginBottomPx: 0.0,
-    marginLeftPx: 211.2, // 2.2in * 96
+    marginLeftPx: 0.0,
+    textAlign: 'center',
     fontWeight: 'bold',
     textTransform: 'uppercase',
   },
@@ -290,7 +292,8 @@ export const SCREENPLAY_BLOCK_STYLES: Record<ScreenplayBlockType, BlockStyleSpec
     linePitchPx: LINE_PITCH_PX,
     marginTopPx: LINE_PITCH_PX, // 20px
     marginBottomPx: LINE_PITCH_PX, // 20px
-    marginLeftPx: 384.0, // 4.0in * 96
+    marginLeftPx: 0.0,
+    textAlign: 'right',
     fontWeight: 'bold',
     textTransform: 'uppercase',
   },
@@ -341,6 +344,9 @@ export function generateBlockCssRules(): string {
     if (spec.textTransform) {
       declarations.push(`  text-transform: ${spec.textTransform};`);
     }
+    if (spec.textAlign) {
+      declarations.push(`  text-align: ${spec.textAlign};`);
+    }
     declarations.push('  overflow: visible;');
     rules.push(`.ProseMirror .${className} {\n${declarations.join('\n')}\n}`);
   });
@@ -354,8 +360,8 @@ export function generateBlockCssRules(): string {
 export function getElementPrintableWidthPx(type: ScreenplayBlockType, printableWidthPx: number): number {
   switch (type) {
     case 'character':
-      // Left margin: 2.2in (211.2px). Printable width = printableWidthPx - 211.2px
-      return Math.max(130.0, printableWidthPx - 211.2);
+      // Centered across full printable width of screenplay writing area
+      return printableWidthPx;
     case 'parenthetical':
       // Left margin: 1.6in (153.6px). Max width: 2.2in (211.2px)
       return Math.min(211.2, Math.max(130.0, printableWidthPx - 153.6));
@@ -363,8 +369,8 @@ export function getElementPrintableWidthPx(type: ScreenplayBlockType, printableW
       // Left margin: 1.0in (96.0px). Max width: 3.5in (336.0px)
       return Math.min(336.0, Math.max(130.0, printableWidthPx - 96.0));
     case 'transition':
-      // Left margin: 4.0in (384.0px)
-      return Math.max(100.0, printableWidthPx - 384.0);
+      // Right-aligned flush against the right margin of the writing area
+      return printableWidthPx;
     case 'scene_heading':
     case 'action':
     case 'shot':

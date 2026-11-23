@@ -66,6 +66,13 @@
   /* Elevation (floating things only) */
   --shadow-overlay: 0 0 0 1px rgba(0,0,0,.5), 0 8px 24px rgba(0,0,0,.45), 0 24px 56px rgba(0,0,0,.35);
   --shadow-thumb:   0 1px 2px rgba(0,0,0,.4);
+  --shadow-palette: 0 1px 2px rgba(0,0,0,.35), 0 6px 16px rgba(0,0,0,.30);
+
+  /* Rail layout */
+  --rail-inset:     var(--space-4);                          /* distance from the window edge: 16 */
+  --rail-gap:       var(--space-1);                          /* between buttons in a group: 4 */
+  --rail-group-gap: var(--space-3);                          /* between groups: 12 */
+  --rail-pad:       var(--space-1);                          /* palette padding: 4 */
 
   /* ---------- 3. DIMENSIONS ------------------------------------------- */
   /* Spacing — 4px grid. Nothing else is allowed. */
@@ -101,6 +108,7 @@
 
   /* Layout */
   --panel-width: 320px;          /* fixed; user-resizable range 280–420 */
+  --left-panel-width: 0px;       /* dynamic; set to var(--panel-width) when left panel is open */
   --panel-header-h: 40px;
   --tabs-h: 36px;
   --panel-pad: var(--space-4);   /* 16px — every panel, every tab */
@@ -125,8 +133,10 @@
 
   /* Motion */
   --ease: cubic-bezier(.2, 0, 0, 1);
+  --ease-in: cubic-bezier(.4, 0, 1, 1);
   --dur-fast: 100ms;   /* hover, press */
-  --dur-base: 160ms;   /* tabs, segmented thumb */
+  --dur-base: 160ms;   /* tabs, segmented thumb, rail expand */
+  --dur-exit: 140ms;   /* rail collapse */
   --dur-slow: 220ms;   /* dialog, panel collapse */
 }
 
@@ -134,5 +144,5 @@
 :lang(pa), .gurmukhi { font-size: 1.08em; line-height: 1.6; }
 
 @media (prefers-reduced-motion: reduce) {
-  :root { --dur-fast: 0ms; --dur-base: 0ms; --dur-slow: 0ms; }
+  :root { --dur-fast: 0ms; --dur-base: 0ms; --dur-exit: 0ms; --dur-slow: 0ms; }
 }

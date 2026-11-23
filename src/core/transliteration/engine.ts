@@ -5,6 +5,19 @@
 
 import { GurmukhiLexicon, UserDictionary, isValidGurmukhiWord } from './lexicon';
 import { CustomDictionary } from './customDictionary';
+import { PersonalizationEngine } from './personalization';
+import {
+  getSpellingRule,
+  isExcludedSpelling,
+} from './spellingCorrections';
+import {
+  getVocabularySuggestions,
+} from './vocabulary';
+import {
+  getShorthandSuggestions,
+} from './shorthand';
+
+export const ROMAN_PUNJABI_COLLISIONS = new Set(['door', 'see', 'sun', 'pan']);
 
 export const EXPLICIT_CONTROL_TOKENS: Record<string, string> = {
   '{ADDAK}': '\u0A71',
@@ -55,9 +68,12 @@ const CONSONANTS: Record<string, string[]> = {
   b: ['ਬ'],
   bh: ['ਭ'],
   m: ['ਮ'],
+  mh: ['\u0A2E\u0A4D\u0A39'],
   y: ['ਯ'],
   r: ['ਰ', 'ੜ'],
+  rh: ['\u0A30\u0A4D\u0A39', '\u0A5C\u0A4D\u0A39'],
   l: ['ਲ', 'ਲ਼'],
+  lh: ['\u0A32\u0A4D\u0A39', '\u0A33\u0A4D\u0A39'],
   v: ['ਵ'],
   w: ['ਵ'],
   s: ['ਸ'],
@@ -101,8 +117,12 @@ export interface SuggestionDetail {
   word: string;
   lexiconFrequency: number;
   userBoost: number;
+  personalBoost?: number;
   isCustomExactMatch: boolean;
   isFuzzy?: boolean;
+  isTranslation?: boolean;
+  isLoanword?: boolean;
+  isShorthand?: boolean;
   totalScore: number;
   rank: number;
 }
@@ -213,15 +233,22 @@ export class GurmukhiTransliterator {
   private lexicon: GurmukhiLexicon;
   private userDict: UserDictionary;
   private customDict: CustomDictionary;
+  private personalization: PersonalizationEngine;
 
   constructor(
     lexicon?: GurmukhiLexicon,
     userDict?: UserDictionary,
-    customDict?: CustomDictionary
+    customDict?: CustomDictionary,
+    personalization?: PersonalizationEngine
   ) {
     this.lexicon = lexicon || new GurmukhiLexicon();
     this.userDict = userDict || new UserDictionary();
     this.customDict = customDict || new CustomDictionary();
+    this.personalization = personalization || new PersonalizationEngine();
+  }
+
+  public getPersonalization(): PersonalizationEngine {
+    return this.personalization;
   }
 
   public getCustomDictionary(): CustomDictionary {
@@ -239,8 +266,12 @@ export class GurmukhiTransliterator {
   /**
    * Record explicit candidate selection to boost future rank (W3, DEC-028)
    */
-  recordSelection(candidate: string): void {
-    this.userDict.recordSelection(candidate);
+  recordSelection(candidate: string, romanInput?: string): void {
+    if (romanInput) {
+      this.personalization.recordSelection(candidate, romanInput);
+    } else {
+      this.userDict.recordSelection(candidate);
+    }
   }
 
   /**
@@ -361,11 +392,39 @@ export class GurmukhiTransliterator {
       };
     }
 
+    // 3.5. Curated spelling rules, vocabulary, and shorthand matches
+    const isCollision = ROMAN_PUNJABI_COLLISIONS.has(lower);
+    const vocabMatches = getVocabularySuggestions(lower);
+    const shorthandMatches = getShorthandSuggestions(lower);
+    const spellingRule = getSpellingRule(lower);
+
     // 4. Generate candidate expansions
     const candidates = this.generateCandidates(lower);
 
-    // 5. Score and rank candidates using the frequency trie + user dictionary
-    const scored: { word: string; score: number; freq: number; userBoost: number }[] = [];
+    // Inject curated candidates into the search set
+    if (spellingRule?.preferred) {
+      for (const p of spellingRule.preferred) {
+        if (!candidates.includes(p)) candidates.unshift(p);
+      }
+    }
+    for (const v of vocabMatches) {
+      if (!candidates.includes(v.word)) candidates.unshift(v.word);
+    }
+    for (const s of shorthandMatches) {
+      if (!candidates.includes(s.word)) candidates.unshift(s.word);
+    }
+
+    // 5. Score and rank candidates using the frequency trie + user dictionary + personalization
+    const scored: {
+      word: string;
+      score: number;
+      freq: number;
+      userBoost: number;
+      personalBoost: number;
+      isTranslation?: boolean;
+      isLoanword?: boolean;
+      isShorthand?: boolean;
+    }[] = [];
     const seen = new Set<string>();
 
     for (const raw of candidates) {
@@ -374,12 +433,33 @@ export class GurmukhiTransliterator {
       if (seen.has(normalized)) continue;
       seen.add(normalized);
 
+      // Check hard exclusions for this Roman input (e.g. 'ਧਯਾਨ' for 'dhyaan', or malformed forms)
+      if (isExcludedSpelling(lower, normalized)) continue;
+
       // Validate Gurmukhi orthography (exclude invalid vowel stacks like ਅੇੰ or double matras)
       if (!isValidGurmukhiWord(normalized)) continue;
 
       const lexFreq = this.lexicon.getFrequency(normalized);
       let score = lexFreq;
       const userBoost = this.userDict.getBoost(normalized);
+      const personalBoost = this.personalization.getBoost(normalized, lower);
+
+      // Curated spelling rule score adjustments
+      if (spellingRule?.scoreAdjustments && spellingRule.scoreAdjustments[normalized] !== undefined) {
+        score += spellingRule.scoreAdjustments[normalized];
+      }
+
+      // Curated vocabulary bonus
+      const vocabMatch = vocabMatches.find((v) => v.word === normalized);
+      if (vocabMatch) {
+        score += vocabMatch.scoreBonus;
+      }
+
+      // Curated shorthand bonus
+      const shortMatch = shorthandMatches.find((s) => s.word === normalized);
+      if (shortMatch) {
+        score += shortMatch.priorityBonus;
+      }
 
       // When user types double 'aa' (e.g. 'daal'), prioritize Kanna-containing words over degraded Mukta words (e.g. 'ਦਾਲ' over 'ਦਲ')
       if (lower.includes('aa') && normalized.includes('\u0A3E')) {
@@ -509,8 +589,17 @@ export class GurmukhiTransliterator {
         score += 2_000_000;
       }
 
-      const totalScore = score + userBoost;
-      scored.push({ word: normalized, score: totalScore, freq: lexFreq, userBoost });
+      const totalScore = score + userBoost + personalBoost;
+      scored.push({
+        word: normalized,
+        score: totalScore,
+        freq: lexFreq,
+        userBoost,
+        personalBoost,
+        isTranslation: vocabMatch?.isTranslation,
+        isLoanword: vocabMatch?.isLoanword,
+        isShorthand: shortMatch !== undefined,
+      });
     }
 
     // Sort descending by score, prioritizing verified dictionary words unless explicit high-priority bonus is set
@@ -523,9 +612,9 @@ export class GurmukhiTransliterator {
       const bHigh = b.score >= 1_000_000;
       if (aHigh !== bHigh) return aHigh ? -1 : 1;
 
-      // 3. Verified lexicon entries beat unverified 0-frequency candidates
-      const aInLex = a.freq > 0;
-      const bInLex = b.freq > 0;
+      // 3. Verified lexicon entries or vocabulary/translation/shorthand beat unverified 0-frequency candidates
+      const aInLex = a.freq > 0 || a.isTranslation || a.isLoanword || a.isShorthand;
+      const bInLex = b.freq > 0 || b.isTranslation || b.isLoanword || b.isShorthand;
       if (aInLex !== bInLex) return aInLex ? -1 : 1;
 
       // 4. Compare total scores (lexicon frequency + heuristic bonuses)
@@ -535,7 +624,13 @@ export class GurmukhiTransliterator {
 
     // 6. Generate phonetic typo variants (Stage 4.B)
     const typoVariants = generatePhoneticTypoVariants(lower);
-    const fuzzyCandidates: { word: string; score: number; freq: number; userBoost: number }[] = [];
+    const fuzzyCandidates: {
+      word: string;
+      score: number;
+      freq: number;
+      userBoost: number;
+      personalBoost: number;
+    }[] = [];
     const seenFuzzy = new Set<string>(seen);
 
     for (const variant of typoVariants) {
@@ -544,13 +639,15 @@ export class GurmukhiTransliterator {
         const normalized = raw.normalize('NFC');
         if (seenFuzzy.has(normalized)) continue;
         seenFuzzy.add(normalized);
+        if (isExcludedSpelling(lower, normalized)) continue;
         if (!isValidGurmukhiWord(normalized)) continue;
 
         const lexFreq = this.lexicon.getFrequency(normalized);
         const userBoost = this.userDict.getBoost(normalized);
+        const personalBoost = this.personalization.getBoost(normalized, lower);
         // Only include fuzzy alternatives that actually exist in the lexicon or user dictionary
-        if (lexFreq > 0 || userBoost > 0) {
-          let fScore = lexFreq + userBoost;
+        if (lexFreq > 0 || userBoost > 0 || personalBoost > 0) {
+          let fScore = lexFreq + userBoost + personalBoost;
           // When roman input ends in 'a', prioritize fuzzy candidates that also preserve final vowel Kanna/Airha
           if (lower.endsWith('a') && (normalized.endsWith('\u0A3E') || normalized.endsWith('\u0A06'))) {
             fScore += 100_000;
@@ -563,6 +660,7 @@ export class GurmukhiTransliterator {
             score: fScore,
             freq: lexFreq,
             userBoost,
+            personalBoost,
           });
         }
       }
@@ -587,6 +685,7 @@ export class GurmukhiTransliterator {
           word: norm,
           lexiconFrequency: this.lexicon.getFrequency(norm),
           userBoost: this.userDict.getBoost(norm),
+          personalBoost: this.personalization.getBoost(norm, lower),
           isCustomExactMatch: true,
           isFuzzy: false,
           totalScore: 2_000_000_000 + this.lexicon.getFrequency(norm) + this.userDict.getBoost(norm),
@@ -595,8 +694,56 @@ export class GurmukhiTransliterator {
       }
     }
 
+    // In collision mode (e.g. 'door', 'see', 'sun'):
+    // Rank 1 must be the high-probability Roman Punjabi phonetic candidate (freq > 0).
+    // Rank 2 must be the English native equivalent (isTranslation: true).
+    if (isCollision && customMatches.length === 0) {
+      const topPhonetic = scored.find(
+        (s) => !s.isTranslation && !s.isLoanword && !s.isShorthand && s.freq > 0
+      );
+      const topTranslation = scored.find((s) => s.isTranslation);
+
+      if (topPhonetic && topTranslation) {
+        if (!seenFinal.has(topPhonetic.word)) {
+          seenFinal.add(topPhonetic.word);
+          finalCandidates.push(topPhonetic.word);
+          detailsMap.set(topPhonetic.word, {
+            word: topPhonetic.word,
+            lexiconFrequency: topPhonetic.freq,
+            userBoost: topPhonetic.userBoost,
+            personalBoost: topPhonetic.personalBoost,
+            isCustomExactMatch: false,
+            isFuzzy: false,
+            isTranslation: topPhonetic.isTranslation,
+            isLoanword: topPhonetic.isLoanword,
+            isShorthand: topPhonetic.isShorthand,
+            totalScore: topPhonetic.score,
+            rank: finalCandidates.length,
+          });
+        }
+
+        if (!seenFinal.has(topTranslation.word)) {
+          seenFinal.add(topTranslation.word);
+          finalCandidates.push(topTranslation.word);
+          detailsMap.set(topTranslation.word, {
+            word: topTranslation.word,
+            lexiconFrequency: topTranslation.freq,
+            userBoost: topTranslation.userBoost,
+            personalBoost: topTranslation.personalBoost,
+            isCustomExactMatch: false,
+            isFuzzy: false,
+            isTranslation: true,
+            isLoanword: false,
+            isShorthand: false,
+            totalScore: topTranslation.score,
+            rank: finalCandidates.length,
+          });
+        }
+      }
+    }
+
     // 2. Add top exact candidate (Rank 1, e.g. 'ਵਦਿਆ' for 'vadiya' or 'ਰਿਹਾ' for 'reha')
-    if (scored.length > 0) {
+    if (finalCandidates.length === 0 && scored.length > 0) {
       const topExact = scored[0];
       if (!seenFinal.has(topExact.word)) {
         seenFinal.add(topExact.word);
@@ -605,8 +752,12 @@ export class GurmukhiTransliterator {
           word: topExact.word,
           lexiconFrequency: topExact.freq,
           userBoost: topExact.userBoost,
+          personalBoost: topExact.personalBoost,
           isCustomExactMatch: false,
           isFuzzy: false,
+          isTranslation: topExact.isTranslation,
+          isLoanword: topExact.isLoanword,
+          isShorthand: topExact.isShorthand,
           totalScore: topExact.score,
           rank: finalCandidates.length,
         });
@@ -618,7 +769,12 @@ export class GurmukhiTransliterator {
     // the user most likely typed a phonetic variation/typo, so offer the high-probability alternative at Rank 2.
     const shouldInjectFuzzyProminently =
       lower === 'vadiya' ||
-      (scored.length > 0 && scored[0].freq === 0 && fuzzyCandidates.length > 0);
+      (scored.length > 0 &&
+        scored[0].freq === 0 &&
+        !scored[0].isTranslation &&
+        !scored[0].isLoanword &&
+        !scored[0].isShorthand &&
+        fuzzyCandidates.length > 0);
 
     let fuzzyIdx = 0;
     if (shouldInjectFuzzyProminently && fuzzyCandidates.length > 0 && finalCandidates.length < maxCandidates) {
@@ -630,6 +786,7 @@ export class GurmukhiTransliterator {
           word: topFuzzy.word,
           lexiconFrequency: topFuzzy.freq,
           userBoost: topFuzzy.userBoost,
+          personalBoost: topFuzzy.personalBoost,
           isCustomExactMatch: false,
           isFuzzy: true,
           totalScore: topFuzzy.score,
@@ -639,7 +796,7 @@ export class GurmukhiTransliterator {
     }
 
     // 4. Append remaining exact candidates
-    for (let i = 1; i < scored.length && finalCandidates.length < maxCandidates; i++) {
+    for (let i = 0; i < scored.length && finalCandidates.length < maxCandidates; i++) {
       const item = scored[i];
       if (!seenFinal.has(item.word)) {
         seenFinal.add(item.word);
@@ -648,8 +805,12 @@ export class GurmukhiTransliterator {
           word: item.word,
           lexiconFrequency: item.freq,
           userBoost: item.userBoost,
+          personalBoost: item.personalBoost,
           isCustomExactMatch: false,
           isFuzzy: false,
+          isTranslation: item.isTranslation,
+          isLoanword: item.isLoanword,
+          isShorthand: item.isShorthand,
           totalScore: item.score,
           rank: finalCandidates.length,
         });
@@ -666,6 +827,7 @@ export class GurmukhiTransliterator {
           word: item.word,
           lexiconFrequency: item.freq,
           userBoost: item.userBoost,
+          personalBoost: item.personalBoost,
           isCustomExactMatch: false,
           isFuzzy: true,
           totalScore: item.score,
@@ -681,6 +843,7 @@ export class GurmukhiTransliterator {
         word: w,
         lexiconFrequency: this.lexicon.getFrequency(w),
         userBoost: this.userDict.getBoost(w),
+        personalBoost: this.personalization.getBoost(w, lower),
         isCustomExactMatch: false,
         isFuzzy: false,
         totalScore: this.lexicon.getFrequency(w) + this.userDict.getBoost(w),

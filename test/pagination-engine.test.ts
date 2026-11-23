@@ -144,7 +144,7 @@ describe('Milestone M1C: Pure Pagination Engine', () => {
       expect(res.pages.length).toBe(1);
       expect(res.pages[0].pageNumber).toBe(1);
       expect(res.pages[0].usedSlots).toBe(2);
-      expect(res.pages[0].remainingSlots).toBe(41); // 43 - 2
+      expect(res.pages[0].remainingSlots).toBe(44); // 46 - 2 (A4 default)
       expect(res.pages[0].isFinalPage).toBe(true);
       expect(res.pages[0].hasHeader).toBe(false); // First page suppresses header
     });

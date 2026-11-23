@@ -35,7 +35,7 @@ export const TitleCard: React.FC<TitleCardProps> = ({
   metadata,
   onMetadataChange,
   onFocusTitle,
-  paperSize = 'letter',
+  paperSize = 'a4',
   isExpanded: controlledIsExpanded,
   onToggleExpand,
 }) => {

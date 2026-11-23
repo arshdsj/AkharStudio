@@ -60,9 +60,8 @@ describe('Phase 1 UI Components (W1b Acceptance Gates)', () => {
       const redoBtn = screen.getByTitle(/Redo/i);
       expect(redoBtn).toBeDisabled();
 
-      // 3. Current Element Indicator
-      const elementIndicator = screen.getByTitle(/Current Screenplay Element: Character/i);
-      expect(elementIndicator).toBeInTheDocument();
+      // 3. Action / Element selector removed from Left Toolbar
+      expect(screen.queryByTitle(/Current Screenplay Element/i)).not.toBeInTheDocument();
 
       // 4. Alignment
       const alignBtn = screen.getByTitle(/Screenplay Element Indentation/i);
@@ -113,11 +112,6 @@ describe('Phase 1 UI Components (W1b Acceptance Gates)', () => {
         />
       );
 
-      // Element selector disabled
-      const titleSelector = screen.getByTitle(/Element selector disabled in Title Card/i);
-      expect(titleSelector).toBeInTheDocument();
-      expect(titleSelector.className).toContain('opacity-30');
-
       // Alignment disabled
       const alignBtn = screen.getByTitle(/Alignment controls disabled in Title Card/i);
       expect(alignBtn).toBeDisabled();
@@ -149,32 +143,34 @@ describe('Phase 1 UI Components (W1b Acceptance Gates)', () => {
     });
   });
 
-  describe('HeaderRow1: Save Status & Minimal Far-Right Diagnostics', () => {
-    it('displays clean save state indicator and icon-only diagnostic controls', () => {
-      const onStartDiagnostics = vi.fn();
+  describe('HeaderRow1: Save Status & Far-Right Projects Button', () => {
+    it('displays clean save state indicator and Projects button without mini diagnostic tool', () => {
+      const onOpenLibrary = vi.fn();
       render(
         <HeaderRow1
           title="Desi Script"
           onTitleChange={vi.fn()}
           saveStatus="clean"
           currentFilePath="/docs/Desi.scriptproject"
-          onOpenLibrary={vi.fn()}
+          onOpenLibrary={onOpenLibrary}
           onOpenSearch={vi.fn()}
           onRetrySave={vi.fn()}
-          onStartDiagnostics={onStartDiagnostics}
-          isDiagnosticsRecording={false}
         />
       );
 
       expect(screen.getByTitle(/All changes saved to disk/i)).toBeInTheDocument();
       expect(screen.getByText('Saved')).toBeInTheDocument();
 
-      // Icon-only diagnostic controls on the far right
-      const startBtn = screen.getByTitle(/Start Recording Diagnostics/i);
-      expect(startBtn).toBeInTheDocument();
-      expect(startBtn).not.toHaveTextContent('Start'); // Icon-only: no text labels
-      fireEvent.click(startBtn);
-      expect(onStartDiagnostics).toHaveBeenCalledTimes(1);
+      // Projects button on the far right
+      const projectsBtn = screen.getByTitle(/Project Library & Files/i);
+      expect(projectsBtn).toBeInTheDocument();
+      expect(projectsBtn).toHaveTextContent('Projects');
+      fireEvent.click(projectsBtn);
+      expect(onOpenLibrary).toHaveBeenCalledTimes(1);
+
+      // Mini diagnostic tool is completely removed
+      expect(screen.queryByTitle(/Start Recording Diagnostics/i)).toBeNull();
+      expect(screen.queryByTitle(/Open Diagnostic Console/i)).toBeNull();
     });
 
     it('displays dirty save state indicator when unsaved', () => {

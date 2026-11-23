@@ -5,16 +5,17 @@
 
 import { Plugin, PluginKey } from 'prosemirror-state';
 import { EditorView, Decoration, DecorationSet } from 'prosemirror-view';
-import { GurmukhiTransliterator } from '../transliteration/engine';
+import { GurmukhiTransliterator, SuggestionDetail } from '../transliteration/engine';
 import { DiagnosticRecorder, globalDiagnosticRecorder } from '../diagnostics/diagnosticRecorder';
 
 export interface TransliterationState {
   isActive: boolean;
   romanBuffer: string;
   candidates: string[];
+  candidateDetails?: SuggestionDetail[];
   selectedIndex: number;
   lastCommitted: { roman: string; gurmukhi: string; pos: number } | null;
-  coords: { top: number; left: number } | null;
+  coords: { top: number; left: number; bottom?: number; right?: number } | null;
   isComposingIME: boolean; // Native OS IME composition flag (DEC-011)
   mode: 'pa' | 'en'; // Active input mode
   anchorPos: number | null; // Document position where uncommitted buffer starts
@@ -40,7 +41,7 @@ export function commitTransliterationCandidate(
     recorder.recordCommit(pluginState.romanBuffer, candidate, pluginState.anchorPos ?? view.state.selection.from, 'click');
   }
 
-  transliterator.recordSelection(candidate);
+  transliterator.recordSelection(candidate, pluginState.romanBuffer);
 
   const anchor = pluginState.anchorPos !== null ? pluginState.anchorPos : view.state.selection.from;
   const tr = view.state.tr.insertText(candidate + ' ', anchor, anchor);
@@ -51,6 +52,7 @@ export function commitTransliterationCandidate(
     isActive: false,
     romanBuffer: '',
     candidates: [],
+    candidateDetails: [],
     selectedIndex: 0,
     anchorPos: null,
     lastCommitted: {
@@ -75,6 +77,7 @@ export function createTransliterationPlugin(
     isActive: false,
     romanBuffer: '',
     candidates: [],
+    candidateDetails: [],
     selectedIndex: 0,
     lastCommitted: null,
     coords: null,
@@ -154,7 +157,7 @@ export function createTransliterationPlugin(
             recorder.recordCommit(pluginState.romanBuffer, chosen, anchor, 'click');
           }
 
-          transliterator.recordSelection(chosen);
+          transliterator.recordSelection(chosen, pluginState.romanBuffer);
 
           const tr = view.state.tr.insertText(chosen + ' ', anchor, anchor);
           view.dispatch(tr);
@@ -187,6 +190,25 @@ export function createTransliterationPlugin(
           return false;
         }
         if (pluginState.isComposingIME || currentMode === 'en') {
+          return false;
+        }
+
+        // Automatic Gurmukhi transliteration is disabled in scene heading blocks
+        const { $from } = view.state.selection;
+        let currentBlockType: string | null = null;
+        if ($from.parent && $from.parent.type.name === 'screenplay_block') {
+          currentBlockType = $from.parent.attrs?.type || null;
+        } else if ($from.depth >= 1) {
+          const blockIndex = $from.index(0);
+          if (blockIndex < view.state.doc.childCount) {
+            currentBlockType = view.state.doc.child(blockIndex).attrs?.type || null;
+          }
+        }
+
+        if (currentBlockType === 'scene_heading') {
+          if (pluginState.isActive) {
+            updateAndNotify({ isActive: false, romanBuffer: '', candidates: [], anchorPos: null }, view);
+          }
           return false;
         }
 
@@ -226,7 +248,7 @@ export function createTransliterationPlugin(
               recorder.recordCommit(pluginState.romanBuffer, chosen, anchor, 'arrow_nav');
             }
 
-            transliterator.recordSelection(chosen);
+            transliterator.recordSelection(chosen, pluginState.romanBuffer);
 
             const tr = view.state.tr.insertText(chosen, anchor, anchor);
             view.dispatch(tr);
@@ -250,6 +272,35 @@ export function createTransliterationPlugin(
           // Space: commit candidate + space as one transaction (DEC-011)
           if (event.key === ' ') {
             event.preventDefault();
+
+            // Shift + Space: Keep English/Roman word unchanged, do not transliterate
+            if (event.shiftKey) {
+              const literal = pluginState.romanBuffer;
+              const anchor = pluginState.anchorPos !== null ? pluginState.anchorPos : view.state.selection.from;
+
+              if (recorder && recorder.isRecording()) {
+                recorder.recordCommit(literal, literal + ' ', anchor, 'shift_space');
+              }
+
+              const tr = view.state.tr.insertText(literal + ' ', anchor, anchor);
+              view.dispatch(tr);
+
+              const newPos = anchor + literal.length + 1;
+              updateAndNotify({
+                isActive: false,
+                romanBuffer: '',
+                candidates: [],
+                selectedIndex: 0,
+                anchorPos: null,
+                lastCommitted: {
+                  roman: literal,
+                  gurmukhi: literal,
+                  pos: newPos,
+                },
+              }, view);
+              return true;
+            }
+
             const chosen = pluginState.candidates[pluginState.selectedIndex] || pluginState.romanBuffer;
             const anchor = pluginState.anchorPos !== null ? pluginState.anchorPos : view.state.selection.from;
 
@@ -258,7 +309,7 @@ export function createTransliterationPlugin(
               recorder.recordCommit(pluginState.romanBuffer, chosen, anchor, 'space');
             }
 
-            transliterator.recordSelection(chosen);
+            transliterator.recordSelection(chosen, pluginState.romanBuffer);
 
             const tr = view.state.tr.insertText(chosen + ' ', anchor, anchor);
             view.dispatch(tr);
@@ -282,6 +333,35 @@ export function createTransliterationPlugin(
           // Enter: accept candidate only; no new block creation from this keypress (DEC-011)
           if (event.key === 'Enter') {
             event.preventDefault();
+
+            // Shift + Enter: commit literal Roman buffer without trailing space (do not select Gurmukhi candidate)
+            if (event.shiftKey) {
+              const literal = pluginState.romanBuffer;
+              const anchor = pluginState.anchorPos !== null ? pluginState.anchorPos : view.state.selection.from;
+
+              if (recorder && recorder.isRecording()) {
+                recorder.recordCommit(literal, literal, anchor, 'shift_enter');
+              }
+
+              const tr = view.state.tr.insertText(literal, anchor, anchor);
+              view.dispatch(tr);
+
+              const newPos = anchor + literal.length;
+              updateAndNotify({
+                isActive: false,
+                romanBuffer: '',
+                candidates: [],
+                selectedIndex: 0,
+                anchorPos: null,
+                lastCommitted: {
+                  roman: literal,
+                  gurmukhi: literal,
+                  pos: newPos,
+                },
+              }, view);
+              return true;
+            }
+
             const chosen = pluginState.candidates[pluginState.selectedIndex] || pluginState.romanBuffer;
             const anchor = pluginState.anchorPos !== null ? pluginState.anchorPos : view.state.selection.from;
 
@@ -290,7 +370,7 @@ export function createTransliterationPlugin(
               recorder.recordCommit(pluginState.romanBuffer, chosen, anchor, 'enter');
             }
 
-            transliterator.recordSelection(chosen);
+            transliterator.recordSelection(chosen, pluginState.romanBuffer);
 
             const tr = view.state.tr.insertText(chosen, anchor, anchor);
             view.dispatch(tr);
@@ -391,17 +471,23 @@ export function createTransliterationPlugin(
             const anchor = pluginState.anchorPos !== null ? pluginState.anchorPos : view.state.selection.from;
 
             if (recorder && recorder.isRecording()) {
-              recorder.recordCommit(literal, literal, anchor, 'fallback_literal');
+              recorder.recordCommit(literal, literal, anchor, event.shiftKey ? 'shift_enter' : 'fallback_literal');
             }
 
             const tr = view.state.tr.insertText(literal, anchor, anchor);
             view.dispatch(tr);
+            const newPos = anchor + literal.length;
             updateAndNotify({
               isActive: false,
               romanBuffer: '',
               candidates: [],
               selectedIndex: 0,
               anchorPos: null,
+              lastCommitted: {
+                roman: literal,
+                gurmukhi: literal,
+                pos: newPos,
+              },
             }, view);
             return true;
           }
@@ -422,7 +508,7 @@ export function createTransliterationPlugin(
             recorder.recordCommit(pluginState.romanBuffer, chosen + event.key, anchor, 'punctuation');
           }
 
-          transliterator.recordSelection(chosen);
+          transliterator.recordSelection(chosen, pluginState.romanBuffer);
 
           const tr = view.state.tr.insertText(chosen + event.key, anchor, anchor);
           view.dispatch(tr);
@@ -471,6 +557,7 @@ export function createTransliterationPlugin(
               updateAndNotify({
                 romanBuffer: newBuf,
                 candidates: newCands,
+                candidateDetails: detailed.details,
                 selectedIndex: 0,
               }, view);
             }
@@ -517,11 +604,16 @@ export function createTransliterationPlugin(
             );
           }
 
-          let coords: { top: number; left: number } | null = null;
+          let coords: { top: number; left: number; bottom?: number; right?: number } | null = null;
           try {
             const pmCoords = view.coordsAtPos(currentAnchor, 1);
             if (pmCoords && (pmCoords.top > 0 || pmCoords.bottom > 0)) {
-              coords = { top: pmCoords.bottom, left: pmCoords.left };
+              coords = {
+                top: pmCoords.top,
+                bottom: pmCoords.bottom,
+                left: pmCoords.left,
+                right: pmCoords.right,
+              };
             }
           } catch {
             coords = null;
@@ -529,13 +621,19 @@ export function createTransliterationPlugin(
 
           if (!coords && view.dom) {
             const rect = view.dom.getBoundingClientRect();
-            coords = { top: rect.top + 28, left: rect.left + 40 };
+            coords = {
+              top: rect.top + 28,
+              bottom: rect.top + 56,
+              left: rect.left + 40,
+              right: rect.left + 40,
+            };
           }
 
           updateAndNotify({
             isActive: true,
             romanBuffer: newBuffer,
             candidates,
+            candidateDetails: detailed.details,
             selectedIndex: 0,
             anchorPos: currentAnchor,
             coords,

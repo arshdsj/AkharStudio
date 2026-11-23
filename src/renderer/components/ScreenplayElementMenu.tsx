@@ -6,6 +6,15 @@
 
 import React, { useEffect, useRef } from 'react';
 import { ScreenplayBlockType } from '../../types/screenplay';
+import {
+  SceneHeadingIcon,
+  ActionIcon,
+  CharacterIcon,
+  ParentheticalIcon,
+  DialogueIcon,
+  ShotIcon,
+  TransitionIcon,
+} from './icons/ScreenplayElementIcons';
 
 export interface ScreenplayElementOption {
   type: ScreenplayBlockType;
@@ -19,126 +28,43 @@ export const SCREENPLAY_ELEMENT_OPTIONS: ScreenplayElementOption[] = [
     type: 'scene_heading',
     label: 'Scene Heading',
     shortcutNumber: '1',
-    icon: (
-      <svg
-        width="15"
-        height="15"
-        viewBox="0 0 24 24"
-        fill="currentColor"
-        className="shrink-0"
-        aria-hidden="true"
-      >
-        <path d="M21 4H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-1 14H4c-.55 0-1-.45-1-1v-1.5l3.5-4.5 2.5 3 4.5-6L19 15.5V17c0 .55-.45 1-1 1z" />
-        <circle cx="8" cy="8.5" r="1.5" />
-      </svg>
-    ),
+    icon: <SceneHeadingIcon size={15} />,
   },
   {
     type: 'action',
     label: 'Action',
     shortcutNumber: '2',
-    icon: (
-      <svg
-        width="15"
-        height="15"
-        viewBox="0 0 24 24"
-        fill="currentColor"
-        className="shrink-0"
-        aria-hidden="true"
-      >
-        <path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3c1.3 1.5 3.3 2.5 5.5 2.5v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7z" />
-      </svg>
-    ),
+    icon: <ActionIcon size={15} />,
   },
   {
     type: 'character',
     label: 'Character',
     shortcutNumber: '3',
-    icon: (
-      <svg
-        width="15"
-        height="15"
-        viewBox="0 0 24 24"
-        fill="currentColor"
-        className="shrink-0"
-        aria-hidden="true"
-      >
-        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-      </svg>
-    ),
+    icon: <CharacterIcon size={15} />,
   },
   {
     type: 'parenthetical',
     label: 'Parenthetical',
     shortcutNumber: '4',
-    icon: (
-      <svg
-        width="15"
-        height="15"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        className="shrink-0"
-        aria-hidden="true"
-      >
-        <path d="M8 4c-3 5-3 11 0 16" />
-        <path d="M16 4c3 5 3 11 0 16" />
-      </svg>
-    ),
+    icon: <ParentheticalIcon size={15} />,
   },
   {
     type: 'dialogue',
     label: 'Dialogue',
     shortcutNumber: '5',
-    icon: (
-      <svg
-        width="15"
-        height="15"
-        viewBox="0 0 24 24"
-        fill="currentColor"
-        className="shrink-0"
-        aria-hidden="true"
-      >
-        <path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM7 11.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z" />
-      </svg>
-    ),
+    icon: <DialogueIcon size={15} />,
   },
   {
     type: 'shot',
     label: 'Shot',
     shortcutNumber: '6',
-    icon: (
-      <svg
-        width="15"
-        height="15"
-        viewBox="0 0 24 24"
-        fill="currentColor"
-        className="shrink-0"
-        aria-hidden="true"
-      >
-        <path d="M4 6.5a2.5 2.5 0 1 0 5 0 2.5 2.5 0 0 0-5 0zm6 0a2.5 2.5 0 1 0 5 0 2.5 2.5 0 0 0-5 0zM3 11c0-.55.45-1 1-1h11c.55 0 1 .45 1 1v8c0 .55-.45 1-1 1H4c-.55 0-1-.45-1-1v-8zm14 2.5l5-3.5v8l-5-3.5v-1z" />
-      </svg>
-    ),
+    icon: <ShotIcon size={15} />,
   },
   {
     type: 'transition',
     label: 'Transition',
     shortcutNumber: '7',
-    icon: (
-      <svg
-        width="15"
-        height="15"
-        viewBox="0 0 24 24"
-        fill="currentColor"
-        className="shrink-0"
-        aria-hidden="true"
-      >
-        <path d="M19 4H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-9 14H6c-.55 0-1-.45-1-1V7c0-.55.45-1 1-1h4v12zm8-1c0 .55-.45 1-1 1h-5V6h5c.55 0 1 .45 1 1v10z" />
-        <line x1="8" y1="21" x2="16" y2="3" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-      </svg>
-    ),
+    icon: <TransitionIcon size={15} />,
   },
 ];
 

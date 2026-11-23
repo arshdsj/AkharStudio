@@ -1,17 +1,41 @@
 /**
- * RightFormattingToolbar.tsx - Contextual Right-Side Formatting Toolbar
- * Adheres strictly to Akhar Studio's Design System (tokens.css, components.css, reference.html)
- * Positioned vertically along the right side of the screenplay workspace.
+ * RightFormattingToolbar.tsx - Claude's Element Rail Redesign
+ * Adheres strictly to Akhar Studio Design System and the Claude Redesign Specification.
+ *
+ * Visual & Interaction Highlights:
+ * - .ds-palette surface (--surface-panel, 8px concentric radius, --shadow-palette, 1px inner edge highlight)
+ * - .ds-tool buttons (32x32px, 16px outline icons, 1.5px stroke, round caps/joins)
+ * - Three semantic groups separated by 12px spacing, no divider lines
+ * - Separate collapse button at bottom (quiet control)
+ * - Active state: --surface-selected tint + --text-accent icon (no solid accent square)
+ * - Mixed selection: clears active state; collapsed chip shows mixed icon
+ * - Compact progressive tooltip (one-line name + shortcut, 900ms description hold, smart neighbour timing)
+ * - Directional collapse (140ms pop-out) and expand (160ms pop-in)
+ * - Radiogroup semantics with roving tabindex and keyboard navigation
+ * - Preserves editor focus and selection (preventDefault on pointerdown/mousedown)
+ * - Responsive auto-collapse when desk margin < 72px without overwriting manual preferences
  */
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { ChevronRight, ChevronLeft } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { ScreenplayBlock, ScreenplayBlockType } from '../../types/screenplay';
+import {
+  SceneHeadingIcon,
+  ActionIcon,
+  CharacterIcon,
+  ParentheticalIcon,
+  DialogueIcon,
+  ShotIcon,
+  TransitionIcon,
+  MixedElementIcon,
+  RailChevronRightIcon,
+  getScreenplayElementIcon,
+} from './icons/ScreenplayElementIcons';
 
 export interface FormattingToolOption {
   type: ScreenplayBlockType;
   label: string;
   shortcutNumber: string;
+  shortcut: string;
   description: string;
   icon: React.ReactNode;
 }
@@ -21,140 +45,67 @@ export const FORMATTING_TOOLBAR_OPTIONS: FormattingToolOption[] = [
     type: 'scene_heading',
     label: 'Scene Heading',
     shortcutNumber: '1',
-    description: 'Location and time of day (slugline). Applies to the selection or the line at your cursor.',
-    icon: (
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="currentColor"
-        className="shrink-0"
-        aria-hidden="true"
-      >
-        <path d="M21 4H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-1 14H4c-.55 0-1-.45-1-1v-1.5l3.5-4.5 2.5 3 4.5-6L19 15.5V17c0 .55-.45 1-1 1z" />
-        <circle cx="8" cy="8.5" r="1.5" />
-      </svg>
-    ),
+    shortcut: 'Mod+1',
+    description: 'Where and when the scene takes place.',
+    icon: <SceneHeadingIcon />,
   },
   {
     type: 'action',
     label: 'Action',
     shortcutNumber: '2',
+    shortcut: 'Mod+2',
     description: 'Scene description and character action. Applies to the selection or the line at your cursor.',
-    icon: (
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="currentColor"
-        className="shrink-0"
-        aria-hidden="true"
-      >
-        <path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3c1.3 1.5 3.3 2.5 5.5 2.5v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7z" />
-      </svg>
-    ),
+    icon: <ActionIcon />,
   },
   {
     type: 'character',
     label: 'Character',
     shortcutNumber: '3',
-    description: 'Character name speaking dialogue. Applies to the selection or the line at your cursor.',
-    icon: (
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="currentColor"
-        className="shrink-0"
-        aria-hidden="true"
-      >
-        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-      </svg>
-    ),
+    shortcut: 'Mod+3',
+    description: 'Who is speaking.',
+    icon: <CharacterIcon />,
   },
   {
     type: 'parenthetical',
     label: 'Parenthetical',
     shortcutNumber: '4',
-    description: 'Actor instruction or attitude. Applies to the selection or the line at your cursor.',
-    icon: (
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        className="shrink-0"
-        aria-hidden="true"
-      >
-        <path d="M8 4c-3 5-3 11 0 16" />
-        <path d="M16 4c3 5 3 11 0 16" />
-      </svg>
-    ),
+    shortcut: 'Mod+4',
+    description: 'How a line is delivered.',
+    icon: <ParentheticalIcon />,
   },
   {
     type: 'dialogue',
     label: 'Dialogue',
     shortcutNumber: '5',
-    description: 'Spoken lines. Applies to the selection or the line at your cursor.',
-    icon: (
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="currentColor"
-        className="shrink-0"
-        aria-hidden="true"
-      >
-        <path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM7 11.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z" />
-      </svg>
-    ),
+    shortcut: 'Mod+5',
+    description: 'What the character says.',
+    icon: <DialogueIcon />,
   },
   {
     type: 'shot',
     label: 'Shot',
     shortcutNumber: '6',
-    description: 'Camera shot or angle. Applies to the selection or the line at your cursor.',
-    icon: (
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="currentColor"
-        className="shrink-0"
-        aria-hidden="true"
-      >
-        <path d="M4 6.5a2.5 2.5 0 1 0 5 0 2.5 2.5 0 0 0-5 0zm6 0a2.5 2.5 0 1 0 5 0 2.5 2.5 0 0 0-5 0zM3 11c0-.55.45-1 1-1h11c.55 0 1 .45 1 1v8c0 .55-.45 1-1 1H4c-.55 0-1-.45-1-1v-8zm14 2.5l5-3.5v8l-5-3.5v-1z" />
-      </svg>
-    ),
+    shortcut: 'Mod+6',
+    description: 'Camera or shot direction.',
+    icon: <ShotIcon />,
   },
   {
     type: 'transition',
     label: 'Transition',
     shortcutNumber: '7',
-    description: 'Scene transition or cut. Applies to the selection or the line at your cursor.',
-    icon: (
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="currentColor"
-        className="shrink-0"
-        aria-hidden="true"
-      >
-        <path d="M19 4H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-9 14H6c-.55 0-1-.45-1-1V7c0-.55.45-1 1-1h4v12zm8-1c0 .55-.45 1-1 1h-5V6h5c.55 0 1 .45 1 1v10z" />
-        <line x1="8" y1="21" x2="16" y2="3" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-      </svg>
-    ),
+    shortcut: 'Mod+7',
+    description: 'How one scene moves to the next.',
+    icon: <TransitionIcon />,
   },
 ];
 
 const STORAGE_KEY = 'akhar_format_toolbar_collapsed';
+const ALT_STORAGE_KEY = 'scriptEditor.railCollapsed';
 
 export interface RightFormattingToolbarProps {
   activeBlock: ScreenplayBlock | null;
+  activeBlockType?: ScreenplayBlockType | null;
+  isMixedSelection?: boolean;
   isTitleEditing: boolean;
   onSelectBlockType: (type: ScreenplayBlockType) => void;
   onKeepFocus?: () => void;
@@ -163,8 +114,20 @@ export interface RightFormattingToolbarProps {
   className?: string;
 }
 
+interface TooltipState {
+  visible: boolean;
+  isDetail: boolean;
+  label: string;
+  shortcut?: string;
+  description?: string;
+  x: number;
+  y: number;
+}
+
 export const RightFormattingToolbar: React.FC<RightFormattingToolbarProps> = ({
   activeBlock,
+  activeBlockType,
+  isMixedSelection = false,
   isTitleEditing,
   onSelectBlockType,
   onKeepFocus,
@@ -172,265 +135,499 @@ export const RightFormattingToolbar: React.FC<RightFormattingToolbarProps> = ({
   onCollapseChange,
   className = '',
 }) => {
-  const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
+  // Determine if running on macOS for shortcut display
+  const isMac = useMemo(() => {
+    if (typeof navigator === 'undefined') return true;
+    return /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '');
+  }, []);
+
+  const formatShortcut = useCallback(
+    (sc: string) => (sc ? sc.replace('Mod+', isMac ? '⌘' : 'Ctrl+') : ''),
+    [isMac]
+  );
+
+  // User's manual preference from localStorage
+  const [userCollapsed, setUserCollapsed] = useState<boolean>(() => {
     if (defaultCollapsed !== undefined) return defaultCollapsed;
     if (typeof localStorage !== 'undefined') {
       try {
-        const saved = localStorage.getItem(STORAGE_KEY);
+        const saved = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(ALT_STORAGE_KEY);
         if (saved !== null) {
-          return saved === 'true';
+          return saved === 'true' || saved === '1';
         }
       } catch {
-        // ignore localStorage read error
+        // Storage access blocked or unavailable
       }
     }
     return false;
   });
 
-  const [hoveredTool, setHoveredTool] = useState<string | null>(null);
-  const [focusedTool, setFocusedTool] = useState<string | null>(null);
+  // Responsive automatic collapse (desk margin < 72px)
+  const [isAutoCollapsed, setIsAutoCollapsed] = useState<boolean>(false);
+  const [animatingState, setAnimatingState] = useState<'open' | 'closing'>('open');
 
-  const toolButtonRefs = useRef<(HTMLButtonElement | null)[]>([]);
-  const collapseButtonRef = useRef<HTMLButtonElement | null>(null);
-  const expandButtonRef = useRef<HTMLButtonElement | null>(null);
+  // Effective collapse state
+  const isCollapsed = userCollapsed || isAutoCollapsed;
 
-  const isMac =
-    typeof navigator !== 'undefined' &&
-    /Mac|iPod|iPhone|iPad/.test(navigator.userAgent);
-  const cmdSymbol = isMac ? '⌘' : 'Ctrl';
+  // Active element type (null when mixed selection or title editing)
+  const effectiveActiveType: ScreenplayBlockType | null = useMemo(() => {
+    if (isTitleEditing || isMixedSelection) return null;
+    if (activeBlockType !== undefined) return activeBlockType;
+    return activeBlock ? activeBlock.type : null;
+  }, [isTitleEditing, isMixedSelection, activeBlockType, activeBlock]);
 
-  const activeTooltip = hoveredTool || focusedTool;
+  // Roving tabindex: which item in the radio group has tabindex=0
+  const [focusedIndex, setFocusedIndex] = useState<number>(0);
 
-  const handleToggleCollapse = useCallback(() => {
-    setIsCollapsed((prev) => {
-      const next = !prev;
-      setHoveredTool(null);
-      setFocusedTool(null);
-      if (typeof localStorage !== 'undefined') {
-        try {
-          localStorage.setItem(STORAGE_KEY, String(next));
-        } catch {
-          // ignore localStorage write error
-        }
-      }
-      onCollapseChange?.(next);
-      return next;
-    });
-  }, [onCollapseChange]);
-
-  // Clean tooltips when unmounting or collapsing
+  // Sync focused index to current active type if changed
   useEffect(() => {
-    if (isCollapsed) {
-      setHoveredTool(null);
-      setFocusedTool(null);
+    if (effectiveActiveType) {
+      const idx = FORMATTING_TOOLBAR_OPTIONS.findIndex((opt) => opt.type === effectiveActiveType);
+      if (idx !== -1) {
+        setFocusedIndex(idx);
+      }
     }
-  }, [isCollapsed]);
+  }, [effectiveActiveType]);
 
-  // Prevent editor focus loss on mouse interaction
+  // Tooltip tracking
+  const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+  const lastHiddenTimeRef = useRef<number>(0);
+  const tipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const detailTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const radioRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const collapseBtnRef = useRef<HTMLButtonElement | null>(null);
+  const chipBtnRef = useRef<HTMLButtonElement | null>(null);
+
+  // Clear timers helper
+  const clearTooltipTimers = useCallback(() => {
+    if (tipTimerRef.current) clearTimeout(tipTimerRef.current);
+    if (detailTimerRef.current) clearTimeout(detailTimerRef.current);
+    tipTimerRef.current = null;
+    detailTimerRef.current = null;
+  }, []);
+
+  const hideTooltip = useCallback(() => {
+    clearTooltipTimers();
+    setTooltip((prev) => {
+      if (prev?.visible) {
+        lastHiddenTimeRef.current = Date.now();
+      }
+      return null;
+    });
+  }, [clearTooltipTimers]);
+
+  const showTooltip = useCallback(
+    (
+      el: HTMLElement,
+      label: string,
+      shortcut?: string,
+      description?: string,
+      immediate: boolean = false
+    ) => {
+      clearTooltipTimers();
+      const isNeighbourInstant = Date.now() - lastHiddenTimeRef.current < 300;
+      const delay = immediate || isNeighbourInstant ? 0 : 400;
+
+      tipTimerRef.current = setTimeout(() => {
+        const rect = el.getBoundingClientRect();
+        // Position immediately to the left of the button with an 8px gap
+        const x = Math.max(8, rect.left - 8);
+        // Anchor top to button's top edge (both compact tooltip row and button are 32px, ensuring perfect vertical alignment)
+        const winHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
+        const y = Math.max(8, Math.min(rect.top, winHeight - 100));
+
+        setTooltip({
+          visible: true,
+          isDetail: false,
+          label,
+          shortcut,
+          description,
+          x,
+          y,
+        });
+      }, delay);
+
+      if (description) {
+        detailTimerRef.current = setTimeout(() => {
+          setTooltip((curr) => (curr && curr.visible ? { ...curr, isDetail: true } : null));
+        }, 900);
+      }
+    },
+    [clearTooltipTimers]
+  );
+
+  // Clean tooltips on unmount or collapse
+  useEffect(() => {
+    return () => clearTooltipTimers();
+  }, [clearTooltipTimers]);
+
+  // Responsive layout check: desk margin beside screenplay page < 72px
+  useEffect(() => {
+    const handleCheckSpace = () => {
+      try {
+        const pageEl = document.querySelector('.screenplay-paper');
+        const deskEl = pageEl?.closest('.flex-1') || pageEl?.parentElement;
+        if (pageEl && deskEl) {
+          const pageRect = pageEl.getBoundingClientRect();
+          const deskRect = deskEl.getBoundingClientRect();
+          const rightMargin = deskRect.right - pageRect.right;
+          if (rightMargin < 72 && rightMargin > 0) {
+            setIsAutoCollapsed(true);
+          } else if (rightMargin >= 72) {
+            setIsAutoCollapsed(false);
+          }
+        } else if (typeof window !== 'undefined') {
+          // Fallback based on typical script desk width threshold (816px + 2*72px)
+          if (window.innerWidth < 980) {
+            setIsAutoCollapsed(true);
+          } else {
+            setIsAutoCollapsed(false);
+          }
+        }
+      } catch {
+        // Ignore measurement errors
+      }
+    };
+
+    handleCheckSpace();
+    window.addEventListener('resize', handleCheckSpace, { passive: true });
+    return () => window.removeEventListener('resize', handleCheckSpace);
+  }, []);
+
+  // Prevent editor focus loss on mouse/pointer interaction
   const preventFocusLoss = (e: React.SyntheticEvent) => {
     e.preventDefault();
   };
 
-  const currentType = activeBlock ? activeBlock.type : null;
+  // Collapse handler
+  const handleCollapse = useCallback(
+    (fromKeyboard: boolean = false) => {
+      hideTooltip();
+      setAnimatingState('closing');
 
-  // Keyboard navigation across the vertical tools
-  const handleKeyDownOnTool = (e: React.KeyboardEvent, index: number) => {
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      const nextIndex = (index + 1) % FORMATTING_TOOLBAR_OPTIONS.length;
-      toolButtonRefs.current[nextIndex]?.focus();
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      if (index === 0) {
-        collapseButtonRef.current?.focus();
-      } else {
-        const prevIndex = index - 1;
-        toolButtonRefs.current[prevIndex]?.focus();
+      const isReduced =
+        typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+          ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
+          : false;
+      const duration = isReduced ? 0 : 140;
+
+      setTimeout(() => {
+        setUserCollapsed(true);
+        setAnimatingState('open');
+        try {
+          localStorage.setItem(STORAGE_KEY, 'true');
+          localStorage.setItem(ALT_STORAGE_KEY, '1');
+        } catch {
+          // ignore storage error
+        }
+        onCollapseChange?.(true);
+
+        if (fromKeyboard) {
+          setTimeout(() => chipBtnRef.current?.focus(), 20);
+        }
+      }, duration);
+    },
+    [hideTooltip, onCollapseChange]
+  );
+
+  // Expand handler
+  const handleExpand = useCallback(
+    (fromKeyboard: boolean = false) => {
+      hideTooltip();
+      setUserCollapsed(false);
+      setIsAutoCollapsed(false);
+      setAnimatingState('open');
+
+      try {
+        localStorage.setItem(STORAGE_KEY, 'false');
+        localStorage.setItem(ALT_STORAGE_KEY, '0');
+      } catch {
+        // ignore storage error
       }
+      onCollapseChange?.(false);
+
+      if (fromKeyboard) {
+        setTimeout(() => {
+          radioRefs.current[focusedIndex]?.focus();
+        }, 20);
+      }
+    },
+    [hideTooltip, focusedIndex, onCollapseChange]
+  );
+
+  // Keyboard navigation within the radio group
+  const handleKeyDownOnRadio = (e: React.KeyboardEvent, index: number) => {
+    const count = FORMATTING_TOOLBAR_OPTIONS.length;
+    let nextIndex = -1;
+
+    if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+      e.preventDefault();
+      nextIndex = (index + 1) % count;
+    } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+      nextIndex = (index - 1 + count) % count;
     } else if (e.key === 'Home') {
       e.preventDefault();
-      toolButtonRefs.current[0]?.focus();
+      nextIndex = 0;
     } else if (e.key === 'End') {
       e.preventDefault();
-      toolButtonRefs.current[FORMATTING_TOOLBAR_OPTIONS.length - 1]?.focus();
+      nextIndex = count - 1;
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      if (!isTitleEditing) {
+        onSelectBlockType(FORMATTING_TOOLBAR_OPTIONS[index].type);
+        onKeepFocus?.();
+      }
+      return;
     } else if (e.key === 'Escape') {
       e.preventDefault();
-      setHoveredTool(null);
-      setFocusedTool(null);
+      hideTooltip();
       onKeepFocus?.();
+      return;
+    }
+
+    if (nextIndex >= 0) {
+      setFocusedIndex(nextIndex);
+      radioRefs.current[nextIndex]?.focus();
+      // Show tooltip immediately on keyboard focus
+      const opt = FORMATTING_TOOLBAR_OPTIONS[nextIndex];
+      const el = radioRefs.current[nextIndex];
+      if (el) {
+        showTooltip(el, opt.label, formatShortcut(opt.shortcut), opt.description, true);
+      }
     }
   };
 
   const handleKeyDownOnCollapse = (e: React.KeyboardEvent) => {
-    if (e.key === 'ArrowDown') {
+    if (e.key === 'ArrowUp') {
       e.preventDefault();
-      toolButtonRefs.current[0]?.focus();
+      setFocusedIndex(FORMATTING_TOOLBAR_OPTIONS.length - 1);
+      radioRefs.current[FORMATTING_TOOLBAR_OPTIONS.length - 1]?.focus();
     } else if (e.key === 'Escape') {
       e.preventDefault();
-      handleToggleCollapse();
+      hideTooltip();
       onKeepFocus?.();
     }
   };
 
-  // If collapsed, display the subtle centered expand toggle
-  if (isCollapsed) {
+  // Tool grouping: 1 (Structure), 2 (Dialogue block), 3 (Camera and scene flow)
+  const group1 = FORMATTING_TOOLBAR_OPTIONS.slice(0, 2); // Scene Heading, Action
+  const group2 = FORMATTING_TOOLBAR_OPTIONS.slice(2, 5); // Character, Parenthetical, Dialogue
+  const group3 = FORMATTING_TOOLBAR_OPTIONS.slice(5, 7); // Shot, Transition
+
+  // Collapsed Chip Label and Icon
+  const currentChipLabel = useMemo(() => {
+    if (isMixedSelection) return 'Mixed';
+    if (!effectiveActiveType) return 'Mixed';
+    const found = FORMATTING_TOOLBAR_OPTIONS.find((o) => o.type === effectiveActiveType);
+    return found ? found.label : 'Mixed';
+  }, [isMixedSelection, effectiveActiveType]);
+
+  const currentChipIcon = useMemo(() => {
+    if (isMixedSelection || !effectiveActiveType) {
+      return <MixedElementIcon />;
+    }
+    return getScreenplayElementIcon(effectiveActiveType);
+  }, [isMixedSelection, effectiveActiveType]);
+
+  // Helper for rendering a single radio tool button
+  const renderToolButton = (opt: FormattingToolOption, globalIndex: number) => {
+    const isSelected = !isTitleEditing && effectiveActiveType === opt.type;
+    const isRovingTarget = focusedIndex === globalIndex;
+    const shortcutLabel = formatShortcut(opt.shortcut);
+
     return (
-      <div
-        className={`ds-right-toolbar__toggle ${className}`}
+      <button
+        key={opt.type}
+        ref={(el) => {
+          radioRefs.current[globalIndex] = el;
+        }}
+        type="button"
+        role="radio"
+        aria-checked={isSelected}
+        aria-pressed={isSelected}
+        aria-disabled={isTitleEditing}
+        disabled={isTitleEditing}
+        tabIndex={isRovingTarget ? 0 : -1}
+        data-el={opt.type}
+        data-tool-type={opt.type}
+        data-active={isSelected ? 'true' : 'false'}
+        data-label={opt.label}
+        data-shortcut={opt.shortcut}
+        data-desc={opt.description}
+        aria-label={`${opt.label} (${shortcutLabel})`}
+        className={`ds-tool ${isSelected ? 'is-active' : ''}`}
         onMouseDown={preventFocusLoss}
         onPointerDown={preventFocusLoss}
+        onClick={() => {
+          if (!isTitleEditing) {
+            setFocusedIndex(globalIndex);
+            onSelectBlockType(opt.type);
+            onKeepFocus?.();
+          }
+        }}
+        onKeyDown={(e) => handleKeyDownOnRadio(e, globalIndex)}
+        onPointerEnter={(e) =>
+          showTooltip(e.currentTarget, opt.label, shortcutLabel, opt.description, false)
+        }
+        onPointerLeave={hideTooltip}
+        onPointerDownCapture={hideTooltip}
+        onFocus={(e) => {
+          setFocusedIndex(globalIndex);
+          if (e.target.matches(':focus-visible')) {
+            showTooltip(e.currentTarget, opt.label, shortcutLabel, opt.description, true);
+          }
+        }}
+        onBlur={hideTooltip}
       >
-        <button
-          ref={expandButtonRef}
-          type="button"
-          onClick={handleToggleCollapse}
-          onMouseDown={preventFocusLoss}
-          onPointerDown={preventFocusLoss}
-          onMouseEnter={() => setHoveredTool('__expand')}
-          onMouseLeave={() => setHoveredTool(null)}
-          onFocus={() => setFocusedTool('__expand')}
-          onBlur={() => setFocusedTool(null)}
-          aria-label="Expand formatting toolbar"
-          aria-expanded={false}
-          className="w-full h-full flex items-center justify-center bg-transparent border-0 cursor-pointer text-inherit rounded"
-        >
-          <ChevronLeft size={16} />
-        </button>
-
-        {activeTooltip === '__expand' && (
-          <div
-            role="tooltip"
-            className="ds-right-toolbar__tooltip--simple animate-in fade-in duration-100"
-          >
-            Expand formatting toolbar
-          </div>
-        )}
-      </div>
+        {opt.icon}
+      </button>
     );
-  }
+  };
 
-  // Expanded complete vertical toolbar
   return (
-    <div
-      role="toolbar"
-      aria-label="Screenplay Formatting"
-      aria-orientation="vertical"
-      className={`ds-right-toolbar ${className}`}
-      onMouseDown={preventFocusLoss}
-      onPointerDown={preventFocusLoss}
-    >
-      {/* 1. Collapse Toggle Button */}
-      <div className="relative flex items-center justify-center">
-        <button
-          ref={collapseButtonRef}
-          type="button"
-          onClick={handleToggleCollapse}
-          onKeyDown={handleKeyDownOnCollapse}
-          onMouseDown={preventFocusLoss}
-          onPointerDown={preventFocusLoss}
-          onMouseEnter={() => setHoveredTool('__collapse')}
-          onMouseLeave={() => setHoveredTool(null)}
-          onFocus={() => setFocusedTool('__collapse')}
-          onBlur={() => setFocusedTool(null)}
-          aria-label="Collapse formatting toolbar"
-          aria-expanded={true}
-          className="ds-right-toolbar__collapse-btn"
-        >
-          <ChevronRight size={15} />
-        </button>
-
-        {activeTooltip === '__collapse' && (
+    <>
+      <div className={`ds-rail-dock ${className}`}>
+        {isCollapsed ? (
+          /* Collapsed state: single chip showing active element icon */
           <div
-            role="tooltip"
-            className="ds-right-toolbar__tooltip--simple animate-in fade-in duration-100"
+            className="ds-palette ds-rail ds-rail--chip"
+            data-state={animatingState}
           >
-            Collapse toolbar
-          </div>
-        )}
-      </div>
-
-      {/* 2. Format Header Label */}
-      <span className="ds-right-toolbar__label" aria-hidden="true">
-        FORMAT
-      </span>
-
-      {/* 3. Horizontal Separator */}
-      <div className="ds-right-toolbar__separator" aria-hidden="true" />
-
-      {/* 4. Screenplay Formatting Tool Buttons */}
-      {FORMATTING_TOOLBAR_OPTIONS.map((opt, idx) => {
-        const isSelected = !isTitleEditing && currentType === opt.type;
-        const isHoveredOrFocused = activeTooltip === opt.type;
-
-        return (
-          <div key={opt.type} className="relative flex items-center justify-center">
             <button
-              ref={(el) => {
-                toolButtonRefs.current[idx] = el;
-              }}
+              ref={chipBtnRef}
               type="button"
-              role="button"
-              aria-label={`${opt.label} (${cmdSymbol} ${opt.shortcutNumber})`}
-              aria-pressed={isSelected}
-              aria-disabled={isTitleEditing}
-              disabled={isTitleEditing}
-              data-tool-type={opt.type}
-              data-active={isSelected ? 'true' : 'false'}
-              onClick={() => {
-                if (!isTitleEditing) {
-                  onSelectBlockType(opt.type);
+              className="ds-tool"
+              aria-label={`Show element types. Current: ${currentChipLabel} (Expand formatting toolbar)`}
+              aria-expanded={false}
+              data-label="Show element types"
+              onMouseDown={preventFocusLoss}
+              onPointerDown={preventFocusLoss}
+              onClick={(e) => handleExpand(e.currentTarget.matches(':focus-visible'))}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  e.preventDefault();
+                  hideTooltip();
                   onKeepFocus?.();
                 }
               }}
-              onKeyDown={(e) => handleKeyDownOnTool(e, idx)}
-              onMouseDown={preventFocusLoss}
-              onPointerDown={preventFocusLoss}
-              onMouseEnter={() => setHoveredTool(opt.type)}
-              onMouseLeave={() => setHoveredTool(null)}
-              onFocus={() => setFocusedTool(opt.type)}
-              onBlur={() => setFocusedTool(null)}
-              className={`ds-right-toolbar__item ${isSelected ? 'is-active' : ''}`}
+              onPointerEnter={(e) =>
+                showTooltip(
+                  e.currentTarget,
+                  `Show element types (Current: ${currentChipLabel})`,
+                  undefined,
+                  undefined,
+                  false
+                )
+              }
+              onPointerLeave={hideTooltip}
+              onPointerDownCapture={hideTooltip}
+              onFocus={(e) => {
+                if (e.target.matches(':focus-visible')) {
+                  showTooltip(
+                    e.currentTarget,
+                    `Show element types (Current: ${currentChipLabel})`,
+                    undefined,
+                    undefined,
+                    true
+                  );
+                }
+              }}
+              onBlur={hideTooltip}
             >
-              {opt.icon}
+              {currentChipIcon}
             </button>
-
-            {/* Contextual Left-Popping Tooltip Card */}
-            {isHoveredOrFocused && (
-              <div
-                role="tooltip"
-                id={`tooltip-${opt.type}`}
-                className="ds-right-toolbar__tooltip animate-in fade-in duration-150"
-              >
-                <div className="flex items-center justify-between gap-2 mb-1">
-                  <span
-                    className="font-semibold text-[13px]"
-                    style={{ color: 'var(--text-primary)' }}
-                  >
-                    {opt.label}
-                  </span>
-                  <span
-                    className="font-mono text-[11px] px-1.5 py-0.5 rounded tracking-tight shrink-0"
-                    style={{
-                      background: 'var(--surface-sunken)',
-                      color: 'var(--text-secondary)',
-                      border: '1px solid var(--line-separator)',
-                    }}
-                  >
-                    {cmdSymbol} {opt.shortcutNumber}
-                  </span>
-                </div>
-                <p
-                  className="text-[11px] leading-relaxed m-0"
-                  style={{ color: 'var(--text-secondary)' }}
-                >
-                  {opt.description}
-                  {isTitleEditing ? ' (Disabled in Title Card)' : ''}
-                </p>
-              </div>
-            )}
           </div>
-        );
-      })}
-    </div>
+        ) : (
+          /* Expanded state: complete Claude redesign vertical palette */
+          <nav
+            className="ds-palette ds-rail"
+            data-state={animatingState}
+            aria-label="Screenplay Formatting"
+            role="toolbar"
+            onMouseDown={preventFocusLoss}
+            onPointerDown={preventFocusLoss}
+          >
+            <div
+              className="ds-rail__radios"
+              role="radiogroup"
+              aria-label="Element type"
+            >
+              {/* Group 1: Structure (Scene Heading, Action) */}
+              <div className="ds-rail__group">
+                {group1.map((opt, i) => renderToolButton(opt, i))}
+              </div>
+
+              {/* Group 2: Dialogue block (Character, Parenthetical, Dialogue) */}
+              <div className="ds-rail__group">
+                {group2.map((opt, i) => renderToolButton(opt, i + 2))}
+              </div>
+
+              {/* Group 3: Camera and scene flow (Shot, Transition) */}
+              <div className="ds-rail__group">
+                {group3.map((opt, i) => renderToolButton(opt, i + 5))}
+              </div>
+            </div>
+
+            {/* Quiet Collapse Control at the bottom */}
+            <div className="ds-rail__group">
+              <button
+                ref={collapseBtnRef}
+                type="button"
+                className="ds-tool"
+                data-rail-collapse
+                data-label="Hide element types"
+                aria-label="Hide element types (Collapse formatting toolbar)"
+                aria-expanded={true}
+                tabIndex={0}
+                onMouseDown={preventFocusLoss}
+                onPointerDown={preventFocusLoss}
+                onClick={(e) => handleCollapse(e.currentTarget.matches(':focus-visible'))}
+                onKeyDown={handleKeyDownOnCollapse}
+                onPointerEnter={(e) =>
+                  showTooltip(e.currentTarget, 'Hide element types', undefined, undefined, false)
+                }
+                onPointerLeave={hideTooltip}
+                onPointerDownCapture={hideTooltip}
+                onFocus={(e) => {
+                  if (e.target.matches(':focus-visible')) {
+                    showTooltip(e.currentTarget, 'Hide element types', undefined, undefined, true);
+                  }
+                }}
+                onBlur={hideTooltip}
+              >
+                <RailChevronRightIcon />
+              </button>
+            </div>
+          </nav>
+        )}
+      </div>
+
+      {/* Compact progressive tooltip */}
+      {tooltip && tooltip.visible && (
+        <div
+          role="tooltip"
+          className={`ds-tip ${tooltip.isDetail ? 'is-detail' : ''}`}
+          style={{
+            position: 'fixed',
+            right: `${window.innerWidth - tooltip.x}px`,
+            top: `${tooltip.y}px`,
+          }}
+        >
+          <div className="ds-tip__row">
+            <span className="ds-tip__name">{tooltip.label}</span>
+            {tooltip.shortcut && <span className="ds-kbd">{tooltip.shortcut}</span>}
+          </div>
+          {tooltip.description && (
+            <div className="ds-tip__expander">
+              <div className="ds-tip__expander-inner">
+                <p className="ds-tip__desc">{tooltip.description}</p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </>
   );
 };

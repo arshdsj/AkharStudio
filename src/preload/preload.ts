@@ -70,6 +70,10 @@ export interface ElectronAPI {
   clearSessionCheckpoint: () => Promise<boolean>;
   confirmQuit: (options?: { forceQuit?: boolean }) => Promise<boolean>;
   onRequestClose: (callback: () => void) => () => void;
+  removeRecentFile: (filePath: string) => Promise<boolean>;
+  getProjectData: (id: string, filePath?: string) => Promise<ScriptProject | null>;
+  deleteProject: (id: string, filePath?: string) => Promise<boolean>;
+  onFileOpened: (callback: (data: { filePath: string; project: ScriptProject }) => void) => () => void;
 }
 
 const api: ElectronAPI = {
@@ -137,6 +141,14 @@ const api: ElectronAPI = {
     const handler = () => callback();
     ipcRenderer.on('app:request-close', handler);
     return () => ipcRenderer.removeListener('app:request-close', handler);
+  },
+  removeRecentFile: (filePath: string) => ipcRenderer.invoke('storage:remove-recent-file', filePath),
+  getProjectData: (id: string, filePath?: string) => ipcRenderer.invoke('storage:get-project-data', id, filePath),
+  deleteProject: (id: string, filePath?: string) => ipcRenderer.invoke('storage:delete-project', id, filePath),
+  onFileOpened: (callback: (data: { filePath: string; project: ScriptProject }) => void) => {
+    const handler = (_event: any, data: { filePath: string; project: ScriptProject }) => callback(data);
+    ipcRenderer.on('app:file-opened', handler);
+    return () => ipcRenderer.removeListener('app:file-opened', handler);
   },
 };
 

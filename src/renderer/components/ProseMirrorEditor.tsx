@@ -25,6 +25,7 @@ import {
   createTransliterationPlugin,
   commitTransliterationCandidate,
   TransliterationState,
+  transliterationPluginKey,
 } from '../../core/editor/transliterationPlugin';
 import { defaultTransliterator } from '../../core/transliteration/defaultEngine';
 import { isLikelyRomanPunjabi } from '../../core/transliteration/textConverter';
@@ -38,6 +39,8 @@ import {
   findNextMatch,
   findPrevMatch,
   clearSearch,
+  replaceCurrentMatch,
+  replaceAllMatches,
   SearchState,
 } from '../../core/editor/searchPlugin';
 import {
@@ -93,6 +96,8 @@ export interface ProseMirrorEditorHandle {
   findNext: () => void;
   findPrev: () => void;
   clearSearch: () => void;
+  replaceCurrent: (replacement: string) => boolean;
+  replaceAll: (replacement: string) => number;
   setBlockType: (type: ScreenplayBlockType) => void;
   toggleFormat: (format: 'bold' | 'italic' | 'underline' | 'strikethrough') => void;
   toggleHighlight: (color?: string) => void;
@@ -101,6 +106,8 @@ export interface ProseMirrorEditorHandle {
   setLink: (url: string) => void;
   setBlockAnnotation: (layer: string) => void;
   setBlockComment: (comment: string) => void;
+  getCursorCoords?: () => { top: number; bottom: number; left: number; right: number } | null;
+  scrollCursorIntoView?: () => void;
 }
 
 export interface PaginationEngineStatus {
@@ -115,11 +122,12 @@ interface ProseMirrorEditorProps {
   contdSetting: ContdSetting;
   inputMode: 'pa' | 'en';
   isVirtualKeyboardOpen?: boolean;
+  keyboardHeight?: number;
   onToggleVirtualKeyboard?: () => void;
   onShiftChange?: (isShift: boolean) => void;
   onAltOrCtrlChange?: (isAltOrCtrl: boolean) => void;
   onTriggerContdPrompt: (characterName: string) => void;
-  onActiveBlockChange: (block: ScreenplayBlock | null) => void;
+  onActiveBlockChange: (block: ScreenplayBlock | null, isMixed?: boolean) => void;
   highlightCharacters?: HighlightCharactersSetting;
   paperSize?: PaperSize;
   isModalOpen?: boolean;
@@ -140,13 +148,14 @@ export const ProseMirrorEditor = React.forwardRef<ProseMirrorEditorHandle, Prose
       contdSetting,
       inputMode,
       isVirtualKeyboardOpen = false,
+      keyboardHeight,
       onToggleVirtualKeyboard,
       onShiftChange,
       onAltOrCtrlChange,
       onTriggerContdPrompt,
       onActiveBlockChange,
       highlightCharacters,
-      paperSize = 'letter',
+      paperSize = 'a4',
       isModalOpen = false,
       onSearchStateChange,
       onDetectRomanPunjabiPaste,
@@ -213,7 +222,7 @@ export const ProseMirrorEditor = React.forwardRef<ProseMirrorEditorHandle, Prose
     // Screenplay Autocomplete state (Character, Scene, Transition)
     const [suggestionState, setSuggestionState] = useState<SuggestionState | null>(null);
     const suggestionStateRef = useRef<SuggestionState | null>(null);
-    const [caretCoords, setCaretCoords] = useState<{ top: number; left: number } | null>(null);
+    const [caretCoords, setCaretCoords] = useState<{ top: number; left: number; bottom?: number; right?: number } | null>(null);
 
     // Format Painter state
     const copiedMarksRef = useRef<readonly Mark[] | null>(null);
@@ -257,6 +266,60 @@ export const ProseMirrorEditor = React.forwardRef<ProseMirrorEditorHandle, Prose
       mode: inputMode,
       anchorPos: null,
     });
+
+    // Dynamically update popup coordinates when scrolling, resizing, or toggling keyboard
+    useEffect(() => {
+      const handleReposition = () => {
+        if (!viewRef.current) return;
+        const view = viewRef.current;
+        const state = view.state;
+
+        // 1. If transliteration popup is active, re-measure anchor coords
+        if (translitState.isActive && translitState.anchorPos !== null) {
+          try {
+            const pmCoords = view.coordsAtPos(translitState.anchorPos, 1);
+            if (pmCoords && (pmCoords.top > 0 || pmCoords.bottom > 0)) {
+              view.dispatch(
+                view.state.tr.setMeta(transliterationPluginKey, {
+                  coords: {
+                    top: pmCoords.top,
+                    bottom: pmCoords.bottom,
+                    left: pmCoords.left,
+                    right: pmCoords.right,
+                  },
+                })
+              );
+            }
+          } catch {
+            // ignore
+          }
+        }
+
+        // 2. If autocomplete popup is active, re-measure selection coords
+        if (suggestionStateRef.current) {
+          try {
+            const coords = view.coordsAtPos(state.selection.from);
+            if (coords && (coords.top > 0 || coords.bottom > 0)) {
+              setCaretCoords({
+                top: coords.top,
+                bottom: coords.bottom,
+                left: coords.left,
+                right: coords.right,
+              });
+            }
+          } catch {
+            // ignore
+          }
+        }
+      };
+
+      window.addEventListener('scroll', handleReposition, true);
+      window.addEventListener('resize', handleReposition);
+      return () => {
+        window.removeEventListener('scroll', handleReposition, true);
+        window.removeEventListener('resize', handleReposition);
+      };
+    }, [translitState.isActive, translitState.anchorPos, isVirtualKeyboardOpen]);
 
     // Text Highlighting / Color Context Menu state
     const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
@@ -444,6 +507,16 @@ export const ProseMirrorEditor = React.forwardRef<ProseMirrorEditorHandle, Prose
         if (!view) return;
         clearSearch(view);
       },
+      replaceCurrent: (replacement: string) => {
+        const view = viewRef.current;
+        if (!view) return false;
+        return replaceCurrentMatch(view, replacement);
+      },
+      replaceAll: (replacement: string) => {
+        const view = viewRef.current;
+        if (!view) return 0;
+        return replaceAllMatches(view, replacement);
+      },
       setBlockType: (type: ScreenplayBlockType) => {
         const view = viewRef.current;
         if (!view) return;
@@ -537,6 +610,21 @@ export const ProseMirrorEditor = React.forwardRef<ProseMirrorEditorHandle, Prose
             dispatch(tr);
           }
         }
+      },
+      getCursorCoords: () => {
+        const view = viewRef.current;
+        if (!view) return null;
+        try {
+          const pos = view.state.selection.from;
+          return view.coordsAtPos(pos);
+        } catch {
+          return null;
+        }
+      },
+      scrollCursorIntoView: () => {
+        const view = viewRef.current;
+        if (!view) return;
+        view.dispatch(view.state.tr.scrollIntoView());
       },
     }));
 
@@ -816,7 +904,13 @@ export const ProseMirrorEditor = React.forwardRef<ProseMirrorEditorHandle, Prose
       const view = new EditorView(editorMountRef.current, {
         state,
         dispatchTransaction(tr: Transaction) {
+          if ((view as any).isDestroyed || !(view as any).docView) {
+            return;
+          }
           const newState = view.state.apply(tr);
+          if ((view as any).isDestroyed || !(view as any).docView) {
+            return;
+          }
           view.updateState(newState);
 
           onSelectionChangeRef.current?.({ from: newState.selection.from, to: newState.selection.to });
@@ -835,16 +929,51 @@ export const ProseMirrorEditor = React.forwardRef<ProseMirrorEditorHandle, Prose
             }
           }
 
-          const { $from } = newState.selection;
-          if ($from.depth >= 1) {
-            const currentBlockNode = newState.doc.child($from.index(0));
-            onActiveBlockChangeRef.current?.({
-              id: currentBlockNode.attrs.id,
-              type: currentBlockNode.attrs.type as ScreenplayBlockType,
-              text: currentBlockNode.textContent,
-              annotationLayer: currentBlockNode.attrs.annotation || undefined,
-              comment: currentBlockNode.attrs.comment || undefined,
+          const { from, to, empty } = newState.selection;
+          if (empty) {
+            const { $from } = newState.selection;
+            if ($from.depth >= 1) {
+              const currentBlockNode = newState.doc.child($from.index(0));
+              onActiveBlockChangeRef.current?.(
+                {
+                  id: currentBlockNode.attrs.id,
+                  type: currentBlockNode.attrs.type as ScreenplayBlockType,
+                  text: currentBlockNode.textContent,
+                  annotationLayer: currentBlockNode.attrs.annotation || undefined,
+                  comment: currentBlockNode.attrs.comment || undefined,
+                },
+                false
+              );
+            } else {
+              onActiveBlockChangeRef.current?.(null, false);
+            }
+          } else {
+            const selectedTypes = new Set<ScreenplayBlockType>();
+            let firstBlockNode: any = null;
+            newState.doc.nodesBetween(from, to, (node) => {
+              if (node.type === screenplaySchema.nodes.screenplay_block) {
+                selectedTypes.add(node.attrs.type as ScreenplayBlockType);
+                if (!firstBlockNode) {
+                  firstBlockNode = node;
+                }
+              }
             });
+
+            const isMixed = selectedTypes.size > 1;
+            if (firstBlockNode) {
+              onActiveBlockChangeRef.current?.(
+                {
+                  id: firstBlockNode.attrs.id,
+                  type: firstBlockNode.attrs.type as ScreenplayBlockType,
+                  text: firstBlockNode.textContent,
+                  annotationLayer: firstBlockNode.attrs.annotation || undefined,
+                  comment: firstBlockNode.attrs.comment || undefined,
+                },
+                isMixed
+              );
+            } else {
+              onActiveBlockChangeRef.current?.(null, false);
+            }
           }
 
           // Format painter application on target selection
@@ -889,7 +1018,12 @@ export const ProseMirrorEditor = React.forwardRef<ProseMirrorEditorHandle, Prose
               setSuggestionState(suggestions);
               try {
                 const coords = view.coordsAtPos(newState.selection.from);
-                setCaretCoords({ top: coords.top, left: coords.left });
+                setCaretCoords({
+                  top: coords.top,
+                  bottom: coords.bottom,
+                  left: coords.left,
+                  right: coords.right,
+                });
               } catch {
                 setCaretCoords(null);
               }
@@ -1014,9 +1148,12 @@ export const ProseMirrorEditor = React.forwardRef<ProseMirrorEditorHandle, Prose
             isOpen={translitState.isActive}
             romanBuffer={translitState.romanBuffer}
             candidates={translitState.candidates}
+            candidateDetails={translitState.candidateDetails}
             selectedIndex={translitState.selectedIndex}
             onSelectCandidate={applyTransliterationCandidate}
             coords={translitState.coords}
+            isVirtualKeyboardOpen={isVirtualKeyboardOpen}
+            keyboardHeight={keyboardHeight}
           />
         )}
 
@@ -1033,6 +1170,8 @@ export const ProseMirrorEditor = React.forwardRef<ProseMirrorEditorHandle, Prose
               setSuggestionState(null);
             }}
             coords={caretCoords}
+            isVirtualKeyboardOpen={isVirtualKeyboardOpen}
+            keyboardHeight={keyboardHeight}
           />
         )}
 

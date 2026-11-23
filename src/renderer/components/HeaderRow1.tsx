@@ -3,20 +3,13 @@
  * Adheres strictly to the Script Editor Design System (tokens.css, components.css, reference.html)
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   FolderOpen,
   Search,
   Check,
   Loader2,
   AlertCircle,
-  Play,
-  Square,
-  MoreVertical,
-  Download,
-  Trash2,
-  Maximize2,
-  Activity,
   FileSpreadsheet,
 } from 'lucide-react';
 import { SaveStatus, ProjectSource } from '../../types/screenplay';
@@ -55,33 +48,19 @@ export const HeaderRow1: React.FC<HeaderRow1Props> = ({
   onOpenSearch,
   onRetrySave,
   onExpandTitlePage,
-  onOpenDiagnostics = () => {},
-  isDiagnosticsRecording = false,
-  onStartDiagnostics = () => {},
-  onStopDiagnostics = () => {},
-  onExportDiagnostics = () => {},
-  onClearOlderDiagnostics = () => {},
+  onOpenDiagnostics: _onOpenDiagnostics = () => {},
+  isDiagnosticsRecording: _isDiagnosticsRecording = false,
+  onStartDiagnostics: _onStartDiagnostics = () => {},
+  onStopDiagnostics: _onStopDiagnostics = () => {},
+  onExportDiagnostics: _onExportDiagnostics = () => {},
+  onClearOlderDiagnostics: _onClearOlderDiagnostics = () => {},
 }) => {
   const [editingTitle, setEditingTitle] = useState(title);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
   const isMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.userAgent);
 
   useEffect(() => {
     setEditingTitle(title);
   }, [title]);
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setDropdownOpen(false);
-      }
-    };
-    if (dropdownOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [dropdownOpen]);
 
   const handleTitleBlur = () => {
     const trimmed = editingTitle.trim();
@@ -121,20 +100,6 @@ export const HeaderRow1: React.FC<HeaderRow1Props> = ({
         <div className="w-[160px] shrink-0 flex items-center">
           <AkharStudioLogo className="mr-1" />
         </div>
-
-        <div style={{ width: '1px', height: '16px', background: 'var(--line-separator)' }} />
-
-        {/* Home / Files button */}
-        <button
-          type="button"
-          onClick={onOpenLibrary}
-          title="Project Library & Files (Cmd/Ctrl+O)"
-          className="ds-btn ds-btn--quiet flex items-center gap-1.5"
-          style={{ height: 'var(--h-md)', padding: '0 var(--space-2)', fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}
-        >
-          <FolderOpen size={15} />
-          <span>Projects</span>
-        </button>
 
         <div style={{ width: '1px', height: '16px', background: 'var(--line-separator)' }} />
 
@@ -181,10 +146,26 @@ export const HeaderRow1: React.FC<HeaderRow1Props> = ({
         >
           <Search size={14} />
         </button>
+      </div>
 
-        <div style={{ width: '1px', height: '16px', background: 'var(--line-separator)' }} />
+      {/* Far Right Area: Save Status & Projects Button */}
+      <div className="flex items-center space-x-2.5 no-drag">
+        {/* Optional standalone file path (Local database indicator removed in v1.6) */}
+        {currentFilePath && (
+          <>
+            <div
+              className="flex items-center gap-1.5 truncate max-w-[240px] font-mono"
+              style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}
+            >
+              <span title={currentFilePath} className="truncate">
+                {currentFilePath.split('/').pop() || currentFilePath.split('\\').pop()}
+              </span>
+            </div>
+            <div style={{ width: '1px', height: '16px', background: 'var(--line-separator)' }} />
+          </>
+        )}
 
-        {/* Save Status Chip */}
+        {/* Save Status Chip (Positioned to the left of Projects button) */}
         <div className="flex items-center no-drag">
           {saveStatus === 'clean' && (
             <div
@@ -205,7 +186,7 @@ export const HeaderRow1: React.FC<HeaderRow1Props> = ({
 
           {saveStatus === 'saving' && (
             <div
-              className="flex items-center gap-1 rounded font-medium animate-pulse"
+              className="flex items-center gap-1 rounded font-medium ds-status-transition"
               style={{
                 height: 'var(--h-sm)',
                 padding: '0 var(--space-2)',
@@ -263,138 +244,20 @@ export const HeaderRow1: React.FC<HeaderRow1Props> = ({
             </button>
           )}
         </div>
-      </div>
 
-      {/* Far Right Area: Standalone file path (if open) & Minimal Icon-Only Diagnostic System */}
-      <div className="flex items-center space-x-2.5 no-drag">
-        {/* Optional standalone file path (Local database indicator removed in v1.6) */}
-        {currentFilePath && (
-          <>
-            <div
-              className="flex items-center gap-1.5 truncate max-w-[240px] font-mono"
-              style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}
-            >
-              <span title={currentFilePath} className="truncate">
-                {currentFilePath.split('/').pop() || currentFilePath.split('\\').pop()}
-              </span>
-            </div>
-            <div style={{ width: '1px', height: '16px', background: 'var(--line-separator)' }} />
-          </>
-        )}
+        <div style={{ width: '1px', height: '16px', background: 'var(--line-separator)' }} />
 
-        {/* Minimal Icon-Only Diagnostic System */}
-        <div
-          className="flex items-center gap-0.5 rounded relative"
-          style={{
-            height: 'var(--h-md)',
-            padding: '2px',
-            background: 'var(--surface-sunken)',
-          }}
-          ref={dropdownRef}
+        {/* Projects button (Moved to the far right, replacing Diagnostic Shortcuts) */}
+        <button
+          type="button"
+          onClick={onOpenLibrary}
+          title="Project Library & Files (Cmd/Ctrl+O)"
+          className="ds-btn ds-btn--quiet flex items-center gap-1.5"
+          style={{ height: 'var(--h-md)', padding: '0 var(--space-2)', fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}
         >
-          {/* Active Recording pulsing dot */}
-          {isDiagnosticsRecording && (
-            <div
-              className="flex items-center px-1.5"
-              title="Diagnostics Recording is active"
-              aria-label="Diagnostics Recording is active"
-            >
-              <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: 'var(--red-600)' }} />
-            </div>
-          )}
-
-          {/* Start Recording (Icon Only) */}
-          <button
-            type="button"
-            onClick={onStartDiagnostics}
-            disabled={isDiagnosticsRecording}
-            title={isDiagnosticsRecording ? 'Recording is currently active' : 'Start Recording Diagnostics'}
-            aria-label="Start Recording Diagnostics"
-            className="ds-icon-btn"
-          >
-            <Play size={12} className="fill-current" />
-          </button>
-
-          {/* Stop Recording (Icon Only) */}
-          <button
-            type="button"
-            onClick={onStopDiagnostics}
-            disabled={!isDiagnosticsRecording}
-            title={!isDiagnosticsRecording ? 'No active recording to stop' : 'Stop Recording Diagnostics'}
-            aria-label="Stop Recording Diagnostics"
-            className="ds-icon-btn"
-            style={isDiagnosticsRecording ? { color: 'var(--text-danger)' } : undefined}
-          >
-            <Square size={12} className="fill-current" />
-          </button>
-
-          {/* Direct Diagnostic Modal Trigger (Icon Only) */}
-          <button
-            type="button"
-            onClick={onOpenDiagnostics}
-            title="Open Diagnostic Console"
-            aria-label="Open Diagnostic Console"
-            className="ds-icon-btn"
-          >
-            <Activity size={13} />
-          </button>
-
-          {/* Diagnostic Options Menu Trigger (⋮) (Icon Only) */}
-          <button
-            type="button"
-            onClick={() => setDropdownOpen(!dropdownOpen)}
-            title="Diagnostic Options"
-            aria-label="Diagnostic Options"
-            className="ds-icon-btn"
-          >
-            <MoreVertical size={13} />
-          </button>
-
-          {/* Dropdown Menu */}
-          {dropdownOpen && (
-            <div
-              className="ds-menu absolute right-0 top-full mt-1.5 z-50"
-            >
-              <button
-                type="button"
-                onClick={() => {
-                  setDropdownOpen(false);
-                  onExportDiagnostics();
-                }}
-                className="ds-row"
-              >
-                <Download className="ds-row__icon" size={14} />
-                <span className="ds-row__label">Export Current Diagnostics</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setDropdownOpen(false);
-                  onClearOlderDiagnostics();
-                }}
-                className="ds-row"
-              >
-                <Trash2 className="ds-row__icon" size={14} />
-                <span className="ds-row__label">Clear Older Diagnostics</span>
-              </button>
-
-              <div className="ds-menu__sep" />
-
-              <button
-                type="button"
-                onClick={() => {
-                  setDropdownOpen(false);
-                  onOpenDiagnostics();
-                }}
-                className="ds-row"
-              >
-                <Maximize2 className="ds-row__icon" size={14} />
-                <span className="ds-row__label">Expand Diagnostic Window</span>
-              </button>
-            </div>
-          )}
-        </div>
+          <FolderOpen size={15} />
+          <span>Projects</span>
+        </button>
       </div>
     </header>
   );
